@@ -1,0 +1,11 @@
+abstract class LocalCache {
+  Future<Map<String, dynamic>?> get(String box, String key);
+  Future<List<Map<String, dynamic>>> getAll(String box);
+  Future<void> put(String box, String key, Map<String, dynamic> data);
+  Future<void> putAll(String box, Map<String, Map<String, dynamic>> entries);
+  Future<void> delete(String box, String key);
+  Future<void> clear(String box);
+  Future<void> clearAll();
+  Future<void> init();
+  Future<void> dispose();
+}

@@ -1,0 +1,41 @@
+1. One user, handled by an auth or profile users
+2. time anallytics
+3. manually, or auto-end after set time of inactivity by the user
+4. Strictly one session.
+
+5. No, i think its is a limitation to windows. similar to how clock timer when we keep on top, like that. clock timer on windows
+6. Close buton, or keyboard shortcut
+7. Yes its draggable and can be locked by the user
+8. Can click into the note (similar to sticky notes - it has some editor features, bold, italic, bullets, etc..), stop timer only on the ui, on "show hidden icons on windows bar" or app if its open, I can open main app for control
+9. Oyu mean floating, it doesn bobs or what ever.
+
+10. spins if there is music, it doesnt spin if paused. it spin if it is running, no color or speed diffrence.
+11. it pause visually only for music not on timer.
+
+12. can skip/pause music (is it controllable?)
+13. yes - just the names and icon/images
+14. here is the flow, music plays - record and the label music pallying shows, if stopped (paused for certain seconds/mins) it slides up.
+
+15. during, can be edited anytime just like windows sticky notes
+16. Free text. 
+17. its just a long ass notes (sub note are included if user whats) but notes are just like sticky notes, it just shows what we are doing via free text. this is not note take sheet.
+
+18. Date, Duration, note fk, list[ ] music played. primary sorting is based on date and time.
+19. by day, and by project.
+20. yes, allows free control but suggested not to.
+21. has daily and weekly total, streaks, most use projects.
+22 yes csv export.
+
+renders on teh top and can be dragged? (yes)
+
+23. Windows first but consider linux and apple for future. lets avoid heavy refactor.
+24. Yes.
+
+25. Possibly.
+26. no, the mini-windows is a very custom ui with timer and rotating disk
+27. keeptrack/time-track/design.md
+29. its  vinyl rotating with the image of the music.
+
+additional:
+
+App is named Trackr_
