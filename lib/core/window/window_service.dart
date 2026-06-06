@@ -27,6 +27,7 @@ class WindowService {
 
     await windowManager.waitUntilReadyToShow(options, () async {
       await windowManager.setBackgroundColor(Colors.transparent);
+      await windowManager.center();
       await windowManager.show();
       await windowManager.focus();
     });
@@ -48,10 +49,10 @@ class WindowService {
     await windowManager.setSkipTaskbar(true);
     await windowManager.setHasShadow(false);
 
-    // Place widget at top-right of the primary display.
+    // Place at top-right with a small inset (4px from right edge, 2px from top).
     final screen = WidgetsBinding.instance.platformDispatcher.views.first;
     final screenW = screen.physicalSize.width / screen.devicePixelRatio;
-    await windowManager.setPosition(Offset(screenW - AppStyling.miniWindowSize.width - 24, 26));
+    await windowManager.setPosition(Offset(screenW - AppStyling.miniWindowSize.width - 4, 2));
   }
 
   Future<void> exitMiniMode() async {
@@ -62,6 +63,7 @@ class WindowService {
     await windowManager.setResizable(true);
     await windowManager.setMinimumSize(AppStyling.fullWindowMinSize);
     await windowManager.setSize(AppStyling.fullWindowSize);
+    await windowManager.center();
     _emit(WindowMode.full);
   }
 

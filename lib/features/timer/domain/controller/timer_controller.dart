@@ -15,6 +15,7 @@ class TimerController {
   Timer? _inactivityTimer;
   SessionModel? _activeSession;
   int _inactivityTimeoutSeconds = 300;
+  String _inactivityBehavior = 'stop'; // 'disabled', 'pause', 'stop'
 
   TimerController(this._timerRepo, this._sessionsRepo)
       : uiState = TimerUiState();
@@ -23,11 +24,16 @@ class TimerController {
     _inactivityTimeoutSeconds = seconds;
   }
 
+  void setInactivityBehavior(String behavior) {
+    _inactivityBehavior = behavior;
+  }
+
   Future<void> resume() async {
     final saved = await _timerRepo.getActiveSession();
     if (saved == null || saved.endedAt != null) return;
     _activeSession = saved;
     _startTicker();
+    _resetInactivityTimer();
     uiState.update((s) => s.copyWith(
           status: TimerStatus.running,
           projectId: saved.projectId,
@@ -61,6 +67,22 @@ class TimerController {
     ));
   }
 
+  Future<void> pause() async {
+    if (!uiState.state.isRunning) return;
+    _ticker?.cancel();
+    _ticker = null;
+    _inactivityTimer?.cancel();
+    _inactivityTimer = null;
+    uiState.update((s) => s.copyWith(status: TimerStatus.paused));
+  }
+
+  Future<void> unpause() async {
+    if (!uiState.state.isPaused) return;
+    _startTicker();
+    _resetInactivityTimer();
+    uiState.update((s) => s.copyWith(status: TimerStatus.running));
+  }
+
   Future<void> stop() async {
     _ticker?.cancel();
     _inactivityTimer?.cancel();
@@ -92,8 +114,6 @@ class TimerController {
     uiState.update((s) => s.copyWith(media: info));
   }
 
-  void onUserActivity() => _resetInactivityTimer();
-
   void _startTicker() {
     _ticker?.cancel();
     final base = _activeSession?.durationSeconds ?? 0;
@@ -106,9 +126,11 @@ class TimerController {
 
   void _resetInactivityTimer() {
     _inactivityTimer?.cancel();
+    _inactivityTimer = null;
+    if (_inactivityBehavior == 'disabled') return;
     _inactivityTimer = Timer(
       Duration(seconds: _inactivityTimeoutSeconds),
-      stop,
+      () => _inactivityBehavior == 'pause' ? pause() : stop(),
     );
   }
 

@@ -54,6 +54,11 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
     _timer.setInactivityTimeout(seconds);
   }
 
+  Future<void> _setInactivityBehavior(String behavior, AppSettingsModel current) async {
+    await _ctrl.update(current.copyWith(inactivityBehavior: behavior));
+    _timer.setInactivityBehavior(behavior);
+  }
+
   Future<void> _setFloatLocked(bool locked, AppSettingsModel current) async {
     await _ctrl.update(current.copyWith(floatLocked: locked));
   }
@@ -144,37 +149,54 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
                       Row(
                         children: [
                           Text(
-                            'inactivity timeout',
+                            'on inactivity',
                             style: dmSans(size: AppStyling.bodySize, color: textMuted),
                           ),
                           const Spacer(),
-                          Text(
-                            '${settings.inactivityTimeoutSeconds ~/ 60} min',
-                            style: spaceMono(
-                              size: 12,
-                              weight: FontWeight.w700,
-                              color: isDark
-                                  ? AppStyling.textPrimaryDark
-                                  : AppStyling.textPrimaryLight,
-                            ),
+                          _InactivityBehaviorPicker(
+                            isDark: isDark,
+                            value: settings.inactivityBehavior,
+                            onChanged: (v) => _setInactivityBehavior(v, settings),
                           ),
                         ],
                       ),
-                      Slider(
-                        value: (settings.inactivityTimeoutSeconds / 60)
-                            .clamp(1.0, 60.0),
-                        min: 1,
-                        max: 60,
-                        divisions: 59,
-                        activeColor: isDark
-                            ? AppStyling.accentPrimaryDark
-                            : AppStyling.accentLight,
-                        inactiveColor: isDark
-                            ? AppStyling.borderDark
-                            : AppStyling.borderLight,
-                        onChanged: (v) =>
-                            _setInactivity(v.round() * 60, settings),
-                      ),
+                      if (settings.inactivityBehavior != 'disabled') ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              'inactivity timeout',
+                              style: dmSans(size: AppStyling.bodySize, color: textMuted),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${settings.inactivityTimeoutSeconds ~/ 60} min',
+                              style: spaceMono(
+                                size: 12,
+                                weight: FontWeight.w700,
+                                color: isDark
+                                    ? AppStyling.textPrimaryDark
+                                    : AppStyling.textPrimaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Slider(
+                          value: (settings.inactivityTimeoutSeconds / 60)
+                              .clamp(1.0, 60.0),
+                          min: 1,
+                          max: 60,
+                          divisions: 59,
+                          activeColor: isDark
+                              ? AppStyling.accentPrimaryDark
+                              : AppStyling.accentLight,
+                          inactiveColor: isDark
+                              ? AppStyling.borderDark
+                              : AppStyling.borderLight,
+                          onChanged: (v) =>
+                              _setInactivity(v.round() * 60, settings),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -512,6 +534,61 @@ class _ExportButtonState extends State<_ExportButton> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Inactivity Behavior Picker ────────────────────────────────────────────────
+
+class _InactivityBehaviorPicker extends StatelessWidget {
+  final bool isDark;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _InactivityBehaviorPicker({
+    required this.isDark,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const options = ['disabled', 'pause', 'stop'];
+    final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+    final border = isDark ? AppStyling.borderDark : AppStyling.borderLight;
+    final textMuted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
+    final textPrimary = isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: options.map((opt) {
+        final selected = value == opt;
+        return GestureDetector(
+          onTap: () => onChanged(opt),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            margin: const EdgeInsets.only(left: 4),
+            decoration: BoxDecoration(
+              color: selected
+                  ? (isDark ? AppStyling.accentDimDark : AppStyling.accentDimLight)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: selected ? accent.withValues(alpha: 0.6) : border,
+              ),
+            ),
+            child: Text(
+              opt,
+              style: spaceMono(
+                size: 10,
+                color: selected ? (isDark ? AppStyling.accentBadgeTextDark : accent) : textMuted,
+                weight: selected ? FontWeight.w700 : FontWeight.w400,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

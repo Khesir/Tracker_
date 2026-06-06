@@ -2,7 +2,7 @@ import '../../../../core/state/stream_state.dart';
 import '../../../../core/models/session_model.dart';
 import '../../../../core/media/media_info.dart';
 
-enum TimerStatus { idle, running, stopping }
+enum TimerStatus { idle, running, paused, stopping }
 
 class TimerUiData {
   final TimerStatus status;
@@ -20,6 +20,7 @@ class TimerUiData {
   });
 
   bool get isRunning => status == TimerStatus.running;
+  bool get isPaused => status == TimerStatus.paused;
 
   TimerUiData copyWith({
     TimerStatus? status,

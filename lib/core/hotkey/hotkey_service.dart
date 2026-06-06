@@ -35,6 +35,8 @@ class HotkeyService {
         final timer = locator.get<TimerController>();
         if (timer.uiState.state.isRunning) {
           await timer.stop();
+        } else if (timer.uiState.state.isPaused) {
+          await timer.unpause();
         } else {
           await windowManager.show();
           await windowManager.focus();
