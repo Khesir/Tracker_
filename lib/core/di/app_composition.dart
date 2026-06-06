@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, debugPrint;
 import '../cache/local_cache.dart';
 import '../cache/hive_local_cache.dart';
 import '../di/service_locator.dart';
@@ -23,9 +23,13 @@ Future<void> initializeApp() async {
   locator.registerSingleton<LocalCache>(cache);
   locator.registerSingleton<WindowService>(WindowService());
 
+  final bool useWindows = !kIsWeb && Platform.isWindows;
+  debugPrint('[App] kIsWeb=$kIsWeb Platform.isWindows=${Platform.isWindows} useWindows=$useWindows');
   final MediaService mediaService =
-      (!kIsWeb && Platform.isWindows) ? WindowsMediaService() : NullMediaService();
+      useWindows ? WindowsMediaService() : NullMediaService();
+  debugPrint('[App] MediaService type=${mediaService.runtimeType}');
   await mediaService.initialize();
+  debugPrint('[App] MediaService initialized, current=${mediaService.current.title}');
   locator.registerSingleton<MediaService>(mediaService);
 
   setupSessionsDependencies();

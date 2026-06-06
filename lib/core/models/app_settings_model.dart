@@ -6,6 +6,9 @@ class AppSettingsModel {
   final double floatOffsetX;
   final double floatOffsetY;
   final String? hotkeyKey;
+  final bool alwaysOnTop;
+  final bool roundToNearest;
+  final bool anchorVinyl;
 
   const AppSettingsModel({
     this.themeKey = 'dark',
@@ -15,6 +18,9 @@ class AppSettingsModel {
     this.floatOffsetX = 40,
     this.floatOffsetY = 40,
     this.hotkeyKey,
+    this.alwaysOnTop = true,
+    this.roundToNearest = false,
+    this.anchorVinyl = true,
   });
 
   Map<String, dynamic> toJson() => {
@@ -25,6 +31,9 @@ class AppSettingsModel {
         'floatOffsetX': floatOffsetX,
         'floatOffsetY': floatOffsetY,
         'hotkeyKey': hotkeyKey,
+        'alwaysOnTop': alwaysOnTop,
+        'roundToNearest': roundToNearest,
+        'anchorVinyl': anchorVinyl,
       };
 
   factory AppSettingsModel.fromJson(Map<String, dynamic> json) => AppSettingsModel(
@@ -35,6 +44,9 @@ class AppSettingsModel {
         floatOffsetX: (json['floatOffsetX'] as num?)?.toDouble() ?? 40,
         floatOffsetY: (json['floatOffsetY'] as num?)?.toDouble() ?? 40,
         hotkeyKey: json['hotkeyKey'] as String?,
+        alwaysOnTop: json['alwaysOnTop'] as bool? ?? true,
+        roundToNearest: json['roundToNearest'] as bool? ?? false,
+        anchorVinyl: json['anchorVinyl'] as bool? ?? true,
       );
 
   AppSettingsModel copyWith({
@@ -45,6 +57,9 @@ class AppSettingsModel {
     double? floatOffsetX,
     double? floatOffsetY,
     String? hotkeyKey,
+    bool? alwaysOnTop,
+    bool? roundToNearest,
+    bool? anchorVinyl,
   }) {
     return AppSettingsModel(
       themeKey: themeKey ?? this.themeKey,
@@ -54,6 +69,9 @@ class AppSettingsModel {
       floatOffsetX: floatOffsetX ?? this.floatOffsetX,
       floatOffsetY: floatOffsetY ?? this.floatOffsetY,
       hotkeyKey: hotkeyKey ?? this.hotkeyKey,
+      alwaysOnTop: alwaysOnTop ?? this.alwaysOnTop,
+      roundToNearest: roundToNearest ?? this.roundToNearest,
+      anchorVinyl: anchorVinyl ?? this.anchorVinyl,
     );
   }
 }

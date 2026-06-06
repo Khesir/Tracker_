@@ -54,10 +54,15 @@ class _TimerScreenState extends State<TimerScreen> {
     _controller = locator.get<TimerController>();
     _projects = locator.get<ProjectsController>();
     _media = locator.get<MediaService>();
+    _currentMedia = _media.current;
     _mediaSub = _media.stream.listen((info) {
+      debugPrint('[TimerScreen] stream event: title=${info.title} playing=${info.isPlaying}');
       if (mounted) setState(() => _currentMedia = info);
       _controller.onMediaChanged(info);
     });
+    // Request a snapshot immediately — C++ fetches SMTC state on a background
+    // thread and pushes the result through the event channel.
+    _media.requestSnapshot();
     _projectsSub = _projects.uiState.stream.listen((state) {
       if (!mounted) return;
       if (state is AsyncData<List<ProjectModel>>) {

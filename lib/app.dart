@@ -13,6 +13,7 @@ import 'features/sessions/presentation/screen/sessions_screen.dart';
 import 'features/analytics/presentation/screen/analytics_screen.dart';
 import 'features/settings/domain/controller/settings_controller.dart';
 import 'features/settings/presentation/screen/settings_screen.dart';
+import 'features/timer/domain/controller/timer_controller.dart';
 import 'features/timer/presentation/screen/timer_screen.dart';
 
 class TrackrApp extends StatefulWidget {
@@ -25,6 +26,7 @@ class TrackrApp extends StatefulWidget {
 class _TrackrAppState extends State<TrackrApp> {
   late final WindowService _windowService;
   late final SettingsController _settingsCtrl;
+  late final TimerController _timerCtrl;
   late final StreamSubscription<WindowMode> _modeSub;
   late final StreamSubscription<AsyncState<AppSettingsModel>> _settingsSub;
   WindowMode _mode = WindowMode.full;
@@ -39,12 +41,14 @@ class _TrackrAppState extends State<TrackrApp> {
     });
 
     _settingsCtrl = locator.get<SettingsController>();
+    _timerCtrl = locator.get<TimerController>();
     _settingsSub = _settingsCtrl.uiState.stream.listen((state) {
       if (state is AsyncData<AppSettingsModel> && mounted) {
-        final mode = state.data.themeKey == 'light'
-            ? ThemeMode.light
-            : ThemeMode.dark;
+        final s = state.data;
+        final mode = s.themeKey == 'light' ? ThemeMode.light : ThemeMode.dark;
         setState(() => _themeMode = mode);
+        _timerCtrl.setInactivityBehavior(s.inactivityBehavior);
+        _timerCtrl.setInactivityTimeout(s.inactivityTimeoutSeconds);
       }
     });
     _settingsCtrl.load();
@@ -109,7 +113,7 @@ class _FullAppShellState extends State<_FullAppShell> {
 
   static const _navItems = [
     _NavItem(label: 'projects_', icon: Icons.folder_outlined),
-    _NavItem(label: 'sessions_', icon: Icons.timer_outlined),
+    _NavItem(label: 'sessions_', icon: Icons.access_time_rounded),
     _NavItem(label: 'analytics_', icon: Icons.bar_chart_rounded),
     _NavItem(label: 'settings_', icon: Icons.settings_outlined),
   ];
@@ -126,7 +130,7 @@ class _FullAppShellState extends State<_FullAppShell> {
       body: Row(
         children: [
           Container(
-            width: 200,
+            width: 198,
             decoration: BoxDecoration(
               color: surface,
               border: Border(right: BorderSide(color: border)),
@@ -134,13 +138,20 @@ class _FullAppShellState extends State<_FullAppShell> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 20),
-                ...List.generate(_navItems.length, (i) => _NavButton(
-                  item: _navItems[i],
-                  selected: _selectedIndex == i,
-                  isDark: isDark,
-                  onTap: () => setState(() => _selectedIndex = i),
-                )),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(13, 15, 13, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: List.generate(_navItems.length, (i) => _NavButton(
+                      item: _navItems[i],
+                      selected: _selectedIndex == i,
+                      isDark: isDark,
+                      onTap: () => setState(() => _selectedIndex = i),
+                    )),
+                  ),
+                ),
+                const Spacer(),
+                _SidebarFooter(isDark: isDark),
               ],
             ),
           ),
@@ -174,17 +185,43 @@ class _NavButton extends StatefulWidget {
   State<_NavButton> createState() => _NavButtonState();
 }
 
+class _SidebarFooter extends StatelessWidget {
+  final bool isDark;
+  const _SidebarFooter({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final faint = isDark ? AppStyling.textFaintDark : AppStyling.textFaintLight;
+    final muted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
+    const style = TextStyle(letterSpacing: 0.06);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(13, 8, 13, 16),
+      child: RichText(
+        text: TextSpan(
+          style: spaceMono(size: 9, color: faint).merge(style),
+          children: [
+            const TextSpan(text: 'trackr_ '),
+            TextSpan(
+              text: 'v1.4.0',
+              style: spaceMono(size: 9, color: muted).merge(style),
+            ),
+            const TextSpan(text: '\nlocal-first · no_cloud'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _NavButtonState extends State<_NavButton> {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    final accent = widget.isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
-    final textPrimary = widget.isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight;
+    final accentIcon = widget.isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+    final accentText = widget.isDark ? AppStyling.accentInkDark : AppStyling.accentInkLight;
     final textMuted = widget.isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
-    final selectedBg = widget.isDark
-        ? AppStyling.accentDimDark
-        : AppStyling.accentDimLight;
+    final selectedBg = widget.isDark ? AppStyling.accentDimDark : AppStyling.accentDimLight;
     final hoverBg = widget.isDark
         ? Colors.white.withValues(alpha: 0.04)
         : Colors.black.withValues(alpha: 0.04);
@@ -196,28 +233,28 @@ class _NavButtonState extends State<_NavButton> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 1.5),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
           decoration: BoxDecoration(
             color: widget.selected
                 ? selectedBg
                 : (_hovered ? hoverBg : Colors.transparent),
-            borderRadius: BorderRadius.circular(AppStyling.cardRadius),
+            borderRadius: BorderRadius.circular(9),
           ),
           child: Row(
             children: [
               Icon(
                 widget.item.icon,
                 size: 16,
-                color: widget.selected ? accent : textMuted,
+                color: widget.selected ? accentIcon : textMuted,
               ),
               const SizedBox(width: 10),
               Text(
                 widget.item.label,
                 style: spaceMono(
-                  size: AppStyling.labelSize,
+                  size: 13,
                   weight: widget.selected ? FontWeight.w700 : FontWeight.w400,
-                  color: widget.selected ? textPrimary : textMuted,
+                  color: widget.selected ? accentText : textMuted,
                 ),
               ),
             ],

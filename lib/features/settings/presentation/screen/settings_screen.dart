@@ -63,6 +63,18 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
     await _ctrl.update(current.copyWith(floatLocked: locked));
   }
 
+  Future<void> _setAlwaysOnTop(bool v, AppSettingsModel current) async {
+    await _ctrl.update(current.copyWith(alwaysOnTop: v));
+  }
+
+  Future<void> _setRoundToNearest(bool v, AppSettingsModel current) async {
+    await _ctrl.update(current.copyWith(roundToNearest: v));
+  }
+
+  Future<void> _setAnchorVinyl(bool v, AppSettingsModel current) async {
+    await _ctrl.update(current.copyWith(anchorVinyl: v));
+  }
+
   Future<void> _exportCsv(BuildContext context, bool isDark, Color textMuted) async {
     final projectsState = _projects.uiState.state;
     final projects = projectsState is AsyncData<List<ProjectModel>>
@@ -97,7 +109,7 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
         state: _ctrl.uiState,
         builder: (context, settings) => CustomScrollView(
           slivers: [
-            // // appearance
+            // appearance
             _SectionHeader(label: '// appearance', textMuted: textMuted),
 
             SliverToBoxAdapter(
@@ -135,158 +147,211 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
               ),
             ),
 
-            // // session
+            // session
             _SectionHeader(label: '// session', textMuted: textMuted),
 
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                child: _SettingRow(
+                child: _SetCard(
                   isDark: isDark,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                  rows: [
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: false,
+                      label: 'inactivity_timeout',
+                      description: null,
+                      right: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
-                            'on inactivity',
-                            style: dmSans(size: AppStyling.bodySize, color: textMuted),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'on_inactivity',
+                                style: spaceMono(size: 10.5, color: textMuted),
+                              ),
+                              const SizedBox(width: 8),
+                              _InactivityBehaviorPicker(
+                                isDark: isDark,
+                                value: settings.inactivityBehavior,
+                                onChanged: (v) => _setInactivityBehavior(v, settings),
+                              ),
+                            ],
                           ),
-                          const Spacer(),
-                          _InactivityBehaviorPicker(
-                            isDark: isDark,
-                            value: settings.inactivityBehavior,
-                            onChanged: (v) => _setInactivityBehavior(v, settings),
-                          ),
-                        ],
-                      ),
-                      if (settings.inactivityBehavior != 'disabled') ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text(
-                              'inactivity timeout',
-                              style: dmSans(size: AppStyling.bodySize, color: textMuted),
+                          if (settings.inactivityBehavior != 'disabled') ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${settings.inactivityTimeoutSeconds ~/ 60} min',
+                                  style: spaceMono(
+                                    size: 12,
+                                    weight: FontWeight.w700,
+                                    color: isDark
+                                        ? AppStyling.textPrimaryDark
+                                        : AppStyling.textPrimaryLight,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const Spacer(),
-                            Text(
-                              '${settings.inactivityTimeoutSeconds ~/ 60} min',
-                              style: spaceMono(
-                                size: 12,
-                                weight: FontWeight.w700,
-                                color: isDark
-                                    ? AppStyling.textPrimaryDark
-                                    : AppStyling.textPrimaryLight,
+                            SizedBox(
+                              width: 200,
+                              child: Slider(
+                                value: (settings.inactivityTimeoutSeconds / 60).clamp(1.0, 60.0),
+                                min: 1,
+                                max: 60,
+                                divisions: 59,
+                                activeColor: isDark
+                                    ? AppStyling.accentPrimaryDark
+                                    : AppStyling.accentLight,
+                                inactiveColor: isDark
+                                    ? AppStyling.borderDark
+                                    : AppStyling.borderLight,
+                                onChanged: (v) => _setInactivity(v.round() * 60, settings),
                               ),
                             ),
                           ],
-                        ),
-                        Slider(
-                          value: (settings.inactivityTimeoutSeconds / 60)
-                              .clamp(1.0, 60.0),
-                          min: 1,
-                          max: 60,
-                          divisions: 59,
-                          activeColor: isDark
-                              ? AppStyling.accentPrimaryDark
-                              : AppStyling.accentLight,
-                          inactiveColor: isDark
-                              ? AppStyling.borderDark
-                              : AppStyling.borderLight,
-                          onChanged: (v) =>
-                              _setInactivity(v.round() * 60, settings),
-                        ),
-                      ],
-                    ],
-                  ),
+                        ],
+                      ),
+                    ),
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: true,
+                      label: 'round_to_nearest',
+                      description: 'snap logged durations for tidy reports',
+                      right: Switch(
+                        value: settings.roundToNearest,
+                        activeTrackColor: isDark
+                            ? AppStyling.accentPrimaryDark
+                            : AppStyling.accentLight,
+                        activeThumbColor: Colors.white,
+                        inactiveTrackColor: isDark
+                            ? AppStyling.borderDark
+                            : AppStyling.borderLightStrong,
+                        onChanged: (v) => _setRoundToNearest(v, settings),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
 
-            // // float
+            // float
             _SectionHeader(label: '// float', textMuted: textMuted),
 
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                child: _SettingRow(
+                child: _SetCard(
                   isDark: isDark,
-                  child: Row(
-                    children: [
-                      Text(
-                        'lock mini window position',
-                        style: dmSans(
-                            size: AppStyling.bodySize, color: textMuted),
-                      ),
-                      const Spacer(),
-                      Switch(
-                        value: settings.floatLocked,
-                        activeThumbColor: isDark
+                  rows: [
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: false,
+                      label: 'always_on_top',
+                      description: 'keep the mini widget above other windows',
+                      right: Switch(
+                        value: settings.alwaysOnTop,
+                        activeTrackColor: isDark
                             ? AppStyling.accentPrimaryDark
                             : AppStyling.accentLight,
+                        activeThumbColor: Colors.white,
+                        inactiveTrackColor: isDark
+                            ? AppStyling.borderDark
+                            : AppStyling.borderLightStrong,
+                        onChanged: (v) => _setAlwaysOnTop(v, settings),
+                      ),
+                    ),
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: false,
+                      label: 'lock_position',
+                      description: 'pin the mini widget so it can\'t be dragged',
+                      right: Switch(
+                        value: settings.floatLocked,
+                        activeTrackColor: isDark
+                            ? AppStyling.accentPrimaryDark
+                            : AppStyling.accentLight,
+                        activeThumbColor: Colors.white,
+                        inactiveTrackColor: isDark
+                            ? AppStyling.borderDark
+                            : AppStyling.borderLightStrong,
                         onChanged: (v) => _setFloatLocked(v, settings),
                       ),
-                    ],
-                  ),
+                    ),
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: true,
+                      label: 'anchor_vinyl',
+                      description: 'let the record overhang the widget edge',
+                      right: Switch(
+                        value: settings.anchorVinyl,
+                        activeTrackColor: isDark
+                            ? AppStyling.accentPrimaryDark
+                            : AppStyling.accentLight,
+                        activeThumbColor: Colors.white,
+                        inactiveTrackColor: isDark
+                            ? AppStyling.borderDark
+                            : AppStyling.borderLightStrong,
+                        onChanged: (v) => _setAnchorVinyl(v, settings),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
 
-            // // hotkey (Phase 10)
-            _SectionHeader(label: '// hotkey', textMuted: textMuted),
-
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                child: _SettingRow(
-                  isDark: isDark,
-                  child: Row(
-                    children: [
-                      Text(
-                        'start / stop session',
-                        style: dmSans(
-                            size: AppStyling.bodySize, color: textMuted),
-                      ),
-                      const Spacer(),
-                      _HotkeyPicker(
-                        isDark: isDark,
-                        currentKey: settings.hotkeyKey ?? 'ctrl+shift+t',
-                        onChanged: (keyStr) async {
-                          await _ctrl.update(
-                              settings.copyWith(hotkeyKey: keyStr));
-                          await _hotkeys.updateHotkey(keyStr);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // // data
-            _SectionHeader(label: '// data', textMuted: textMuted),
+            // shortcuts & data
+            _SectionHeader(label: '// shortcuts & data', textMuted: textMuted),
 
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                child: _SettingRow(
+                child: _SetCard(
                   isDark: isDark,
-                  child: Row(
-                    children: [
-                      Text(
-                        'export all sessions as CSV',
-                        style: dmSans(
-                            size: AppStyling.bodySize, color: textMuted),
+                  rows: [
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: false,
+                      label: 'start_/_stop_session',
+                      description: null,
+                      right: _HotkeyPicker(
+                        isDark: isDark,
+                        currentKey: settings.hotkeyKey ?? 'ctrl+shift+t',
+                        onChanged: (keyStr) async {
+                          await _ctrl.update(settings.copyWith(hotkeyKey: keyStr));
+                          await _hotkeys.updateHotkey(keyStr);
+                        },
                       ),
-                      const Spacer(),
-                      _ExportButton(
+                    ),
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: false,
+                      label: 'export_all_sessions',
+                      description: 'download your full history as a .csv file',
+                      right: _ExportButton(
                         isDark: isDark,
                         textMuted: textMuted,
-                        onTap: () =>
-                            _exportCsv(context, isDark, textMuted),
+                        onTap: () => _exportCsv(context, isDark, textMuted),
                       ),
-                    ],
-                  ),
+                    ),
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: true,
+                      label: 'storage',
+                      description: 'everything stays on this device',
+                      right: Text(
+                        '~/.trackr',
+                        style: spaceMono(
+                          size: 11,
+                          color: textMuted,
+                          weight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -319,28 +384,80 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _SettingRow extends StatelessWidget {
-  final Widget child;
+class _SetCard extends StatelessWidget {
   final bool isDark;
+  final List<Widget> rows;
 
-  const _SettingRow({required this.child, required this.isDark});
+  const _SetCard({required this.isDark, required this.rows});
 
   @override
   Widget build(BuildContext context) {
     final surface = isDark ? AppStyling.surfaceDark : AppStyling.surfaceLight;
-    final border = isDark ? AppStyling.borderDark : AppStyling.borderLight;
+    final border = isDark ? AppStyling.borderDark : AppStyling.borderLightStrong;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppStyling.cardPaddingH,
-        vertical: AppStyling.cardPaddingV,
-      ),
       decoration: BoxDecoration(
         color: surface,
-        borderRadius: BorderRadius.circular(AppStyling.cardRadius),
+        borderRadius: BorderRadius.circular(13),
         border: Border.all(color: border),
       ),
-      child: child,
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: rows),
+    );
+  }
+}
+
+class _SetRow extends StatelessWidget {
+  final bool isDark;
+  final bool isLast;
+  final String label;
+  final String? description;
+  final Widget right;
+
+  const _SetRow({
+    required this.isDark,
+    required this.isLast,
+    required this.label,
+    required this.description,
+    required this.right,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = isDark ? AppStyling.borderDark : AppStyling.borderLight;
+    final textPrimary = isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight;
+    final textMuted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : Border(bottom: BorderSide(color: borderColor)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: spaceMono(size: 12.5, weight: FontWeight.w700, color: textPrimary),
+                ),
+                if (description != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    description!,
+                    style: spaceMono(size: 10.5, color: textMuted),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          right,
+        ],
+      ),
     );
   }
 }
@@ -412,7 +529,6 @@ class _ThemeCardState extends State<_ThemeCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // mini preview
               Container(
                 height: 54,
                 decoration: BoxDecoration(
@@ -422,7 +538,6 @@ class _ThemeCardState extends State<_ThemeCard> {
                 ),
                 child: Row(
                   children: [
-                    // sidebar strip
                     Container(
                       width: 22,
                       decoration: BoxDecoration(
@@ -436,7 +551,6 @@ class _ThemeCardState extends State<_ThemeCard> {
                         ),
                       ),
                     ),
-                    // content area with accent dot
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.all(8),
@@ -557,7 +671,6 @@ class _InactivityBehaviorPicker extends StatelessWidget {
     final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
     final border = isDark ? AppStyling.borderDark : AppStyling.borderLight;
     final textMuted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
-    final textPrimary = isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -726,13 +839,11 @@ class _CaptureDialogState extends State<_CaptureDialog> {
           final keyStr = _buildKeyStr(event);
           if (keyStr.isEmpty) return;
           setState(() => _preview = keyStr);
-          // Confirm on Enter or when a non-modifier key is pressed with modifier
           if (event.logicalKey == LogicalKeyboardKey.escape) {
             Navigator.pop(context, null);
           } else if (event.logicalKey == LogicalKeyboardKey.enter) {
             if (_preview.isNotEmpty) Navigator.pop(context, _preview);
           } else if (_preview.contains('+')) {
-            // key with at least one modifier — confirm immediately
             final captured = _preview;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) Navigator.pop(context, captured);

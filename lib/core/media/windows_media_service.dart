@@ -42,6 +42,9 @@ class WindowsMediaService implements MediaService {
   }
 
   @override
+  Future<void> requestSnapshot() async {}
+
+  @override
   Future<void> playPause() async {
     try {
       await _method.invokeMethod('playPause');

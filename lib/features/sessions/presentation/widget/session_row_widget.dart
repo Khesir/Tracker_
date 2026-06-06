@@ -25,12 +25,12 @@ class SessionRowWidget extends StatefulWidget {
 class _SessionRowWidgetState extends State<SessionRowWidget> {
   bool _hovered = false;
 
-  String _formatDuration(int seconds) {
-    if (seconds < 60) return '${seconds}s';
-    final h = seconds ~/ 3600;
-    final m = (seconds % 3600) ~/ 60;
-    if (h == 0) return '${m}m';
-    return '${h}h ${m}m';
+  Color _projectColor() {
+    try {
+      return Color(int.parse(widget.projectColorHex.replaceFirst('#', '0xFF')));
+    } catch (_) {
+      return AppStyling.accentLight;
+    }
   }
 
   String _formatTime(DateTime dt) {
@@ -54,33 +54,30 @@ class _SessionRowWidgetState extends State<SessionRowWidget> {
     }
   }
 
-  Color _projectColor() {
-    try {
-      return Color(
-          int.parse(widget.projectColorHex.replaceFirst('#', '0xFF')));
-    } catch (_) {
-      return AppStyling.accentLight;
-    }
+  ({String value, String unit}) _splitDuration(int seconds) {
+    if (seconds < 60) return (value: '$seconds', unit: 's');
+    final h = seconds ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    if (h == 0) return (value: '$m', unit: 'm');
+    return (value: '${h}h $m', unit: 'm');
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppStyling.surfaceDark : AppStyling.surfaceLight;
-    final border = isDark ? AppStyling.borderDark : AppStyling.borderLight;
-    final textPrimary =
-        isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight;
-    final textMuted =
-        isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
-    final accent =
-        isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+    final borderColor = isDark ? AppStyling.borderDark : AppStyling.borderLightStrong;
+    final hoverBorderColor = isDark ? const Color(0xFF2A5A7A) : const Color(0xFFDADCE1);
+    final textPrimary = isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight;
+    final textMuted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
+    final textFaint = isDark ? AppStyling.textFaintDark : AppStyling.textFaintLight;
 
-    final hoverBg = isDark
-        ? Colors.white.withValues(alpha: 0.03)
-        : Colors.black.withValues(alpha: 0.02);
-
+    final projectColor = _projectColor();
     final noteText = _notePlainText(widget.session.noteJson);
-    final color = _projectColor();
+    final timeRange = widget.session.endedAt != null
+        ? '${_formatTime(widget.session.startedAt)} → ${_formatTime(widget.session.endedAt!)}'
+        : '${_formatTime(widget.session.startedAt)} → …';
+    final dur = _splitDuration(widget.session.durationSeconds);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -90,92 +87,95 @@ class _SessionRowWidgetState extends State<SessionRowWidget> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppStyling.cardPaddingH,
-            vertical: AppStyling.cardPaddingV,
-          ),
           decoration: BoxDecoration(
-            color: _hovered ? hoverBg : surface,
-            borderRadius: BorderRadius.circular(AppStyling.cardRadius),
-            border: Border.all(color: border),
+            color: surface,
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: _hovered ? hoverBorderColor : borderColor),
+            boxShadow: _hovered
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: .2),
+                      offset: const Offset(0, 4),
+                      blurRadius: 14,
+                      spreadRadius: -8,
+                    )
+                  ]
+                : null,
           ),
-          child: Row(
-            children: [
-              // // color strip
-              Container(
-                width: 3,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: projectColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(11),
+                      bottomLeft: Radius.circular(11),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                SizedBox(
+                  width: 128,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 13, 0, 13),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           widget.projectName,
-                          style: spaceMono(
-                              size: AppStyling.labelSize,
-                              weight: FontWeight.w700,
-                              color: accent),
+                          style: spaceMono(size: 13, weight: FontWeight.w700, color: projectColor),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(height: 5),
                         Text(
-                          _formatTime(widget.session.startedAt),
-                          style: dmSans(
-                              size: AppStyling.labelSize, color: textMuted),
+                          timeRange,
+                          style: spaceMono(size: 10.5, color: textMuted),
                         ),
                       ],
                     ),
-                    if (noteText.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        noteText,
-                        style: dmSans(
-                            size: AppStyling.labelSize, color: textMuted),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _formatDuration(widget.session.durationSeconds),
-                    style: spaceMono(
-                        size: 12,
-                        weight: FontWeight.w700,
-                        color: textPrimary),
                   ),
-                  if (widget.session.musicLog.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.music_note_rounded,
-                              size: 10, color: textMuted),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${widget.session.musicLog.length}',
-                            style: dmSans(
-                                size: AppStyling.labelSize, color: textMuted),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_rounded, size: 12, color: textFaint),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            noteText.isEmpty ? 'no note' : noteText,
+                            style: spaceMono(
+                              size: 11,
+                              color: noteText.isEmpty ? textFaint : textMuted,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                ],
-              ),
-            ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 13, 17, 13),
+                  child: RichText(
+                    text: TextSpan(
+                      style: spaceMono(size: 14, weight: FontWeight.w800, color: textPrimary),
+                      children: [
+                        TextSpan(text: dur.value),
+                        TextSpan(
+                          text: dur.unit,
+                          style: spaceMono(size: 10, weight: FontWeight.w500, color: textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

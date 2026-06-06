@@ -5,6 +5,7 @@ abstract class MediaService {
   MediaInfo get current;
 
   Future<void> initialize();
+  Future<void> requestSnapshot();
   Future<void> playPause();
   Future<void> skipNext();
   Future<void> skipPrevious();
@@ -20,6 +21,9 @@ class NullMediaService implements MediaService {
 
   @override
   Future<void> initialize() async {}
+
+  @override
+  Future<void> requestSnapshot() async {}
 
   @override
   Future<void> playPause() async {}

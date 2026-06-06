@@ -10,6 +10,7 @@ import '../../../../core/ui/scoped_screen.dart';
 import '../../../projects/domain/controller/projects_controller.dart';
 import '../../domain/controller/sessions_controller.dart';
 import '../sheets/session_detail_sheet.dart';
+import '../widget/session_heatmap_widget.dart';
 import '../widget/session_row_widget.dart';
 
 class SessionsScreen extends ScopedScreen {
@@ -22,6 +23,9 @@ class SessionsScreen extends ScopedScreen {
 class _SessionsScreenState extends ScopedScreenState<SessionsScreen> {
   late final SessionsController _sessionsCtrl;
   late final ProjectsController _projectsCtrl;
+
+  String _selectedView = '1y';
+  String _selectedProject = 'all';
 
   @override
   void registerServices() {
@@ -44,11 +48,28 @@ class _SessionsScreenState extends ScopedScreenState<SessionsScreen> {
   Map<DateTime, List<SessionModel>> _groupByDay(List<SessionModel> sessions) {
     final map = <DateTime, List<SessionModel>>{};
     for (final s in sessions) {
-      final day =
-          DateTime(s.startedAt.year, s.startedAt.month, s.startedAt.day);
+      final day = DateTime(s.startedAt.year, s.startedAt.month, s.startedAt.day);
       map.putIfAbsent(day, () => []).add(s);
     }
     return map;
+  }
+
+  Map<DateTime, int> _buildDailySeconds(
+    List<SessionModel> sessions,
+    String projectFilter,
+  ) {
+    final map = <DateTime, int>{};
+    for (final s in sessions) {
+      if (projectFilter != 'all' && s.projectId != projectFilter) continue;
+      final day = DateTime(s.startedAt.year, s.startedAt.month, s.startedAt.day);
+      map[day] = (map[day] ?? 0) + s.durationSeconds;
+    }
+    return map;
+  }
+
+  List<String> _buildAvailableYears(List<SessionModel> sessions) {
+    final years = sessions.map((s) => s.startedAt.year).toSet().toList()..sort((a, b) => b.compareTo(a));
+    return years.map((y) => y.toString()).toList();
   }
 
   String _formatDay(DateTime day) {
@@ -110,10 +131,8 @@ class _SessionsScreenState extends ScopedScreenState<SessionsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppStyling.bgDark : AppStyling.bgLight;
-    final textMuted =
-        isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
-    final accent =
-        isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+    final textMuted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
+    final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
 
     return Scaffold(
       backgroundColor: bg,
@@ -125,40 +144,62 @@ class _SessionsScreenState extends ScopedScreenState<SessionsScreen> {
               : <ProjectModel>[];
           final nameMap = _buildNameMap(projects);
           final colorMap = _buildColorMap(projects);
+          final projectChips = projects
+              .map((p) => (id: p.id, name: p.name, colorHex: p.colorHex))
+              .toList();
 
           return AsyncStreamBuilder<List<SessionModel>>(
             state: _sessionsCtrl.uiState,
             builder: (context, sessions) {
-              final groups = _groupByDay(sessions);
-              final days = groups.keys.toList()
-                ..sort((a, b) => b.compareTo(a));
+              final filteredSessions = _selectedProject == 'all'
+                  ? sessions
+                  : sessions.where((s) => s.projectId == _selectedProject).toList();
+              final groups = _groupByDay(filteredSessions);
+              final days = groups.keys.toList()..sort((a, b) => b.compareTo(a));
+              final dailySeconds = _buildDailySeconds(sessions, _selectedProject);
+              final availableYears = _buildAvailableYears(sessions);
 
               return CustomScrollView(
                 slivers: [
-                  // header row
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: SessionHeatmapWidget(
+                        dailySeconds: dailySeconds,
+                        selectedView: _selectedView,
+                        availableYears: availableYears,
+                        onViewChanged: (v) => setState(() => _selectedView = v),
+                        selectedProject: _selectedProject,
+                        projects: projectChips,
+                        onProjectChanged: (p) => setState(() => _selectedProject = p),
+                      ),
+                    ),
+                  ),
+
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                       child: Row(
                         children: [
                           Text(
-                            '// sessions',
+                            '// all sessions',
                             style: spaceMono(size: 10, color: textMuted),
                           ),
                           const Spacer(),
+                          _FilterButton(isDark: isDark, textMuted: textMuted),
+                          const SizedBox(width: 6),
                           if (sessions.isNotEmpty)
                             _ExportButton(
                               isDark: isDark,
                               textMuted: textMuted,
-                              onTap: () => _exportCsv(
-                                  context, nameMap, isDark, textMuted),
+                              onTap: () => _exportCsv(context, nameMap, isDark, textMuted),
                             ),
                         ],
                       ),
                     ),
                   ),
 
-                  if (sessions.isEmpty)
+                  if (filteredSessions.isEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(20, 60, 20, 0),
@@ -172,11 +213,9 @@ class _SessionsScreenState extends ScopedScreenState<SessionsScreen> {
                     )
                   else
                     for (final day in days) ...[
-                      // day header
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding:
-                              const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                           child: Row(
                             children: [
                               Text(
@@ -194,8 +233,6 @@ class _SessionsScreenState extends ScopedScreenState<SessionsScreen> {
                           ),
                         ),
                       ),
-
-                      // session rows
                       SliverPadding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         sliver: SliverList.separated(
@@ -206,12 +243,9 @@ class _SessionsScreenState extends ScopedScreenState<SessionsScreen> {
                             final session = groups[day]![i];
                             return SessionRowWidget(
                               session: session,
-                              projectName:
-                                  nameMap[session.projectId] ?? 'unknown',
-                              projectColorHex:
-                                  colorMap[session.projectId] ?? '#22C55E',
-                              onTap: () => _openDetail(
-                                  context, session, nameMap, colorMap),
+                              projectName: nameMap[session.projectId] ?? 'unknown',
+                              projectColorHex: colorMap[session.projectId] ?? '#22C55E',
+                              onTap: () => _openDetail(context, session, nameMap, colorMap),
                             );
                           },
                         ),
@@ -226,11 +260,57 @@ class _SessionsScreenState extends ScopedScreenState<SessionsScreen> {
               child: CircularProgressIndicator(strokeWidth: 1.5),
             ),
             errorBuilder: (context, msg) => Center(
-              child:
-                  Text('error: $msg', style: spaceMono(size: 11, color: textMuted)),
+              child: Text('error: $msg', style: spaceMono(size: 11, color: textMuted)),
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _FilterButton extends StatefulWidget {
+  final bool isDark;
+  final Color textMuted;
+
+  const _FilterButton({required this.isDark, required this.textMuted});
+
+  @override
+  State<_FilterButton> createState() => _FilterButtonState();
+}
+
+class _FilterButtonState extends State<_FilterButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final border = widget.isDark ? AppStyling.borderDark : AppStyling.borderLight;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: _hovered
+              ? widget.textMuted.withValues(alpha: 0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.tune_rounded, size: 12, color: widget.textMuted),
+            const SizedBox(width: 5),
+            Text(
+              'filter_',
+              style: spaceMono(size: 10, color: widget.textMuted),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -256,8 +336,7 @@ class _ExportButtonState extends State<_ExportButton> {
 
   @override
   Widget build(BuildContext context) {
-    final border =
-        widget.isDark ? AppStyling.borderDark : AppStyling.borderLight;
+    final border = widget.isDark ? AppStyling.borderDark : AppStyling.borderLight;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

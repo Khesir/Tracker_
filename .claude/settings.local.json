@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:api.anthropic.com)",
-      "Bash(flutter analyze *)"
+      "Bash(flutter analyze *)",
+      "PowerShell($gzipPath = \"C:\\\\Users\\\\ajriz\\\\.claude\\\\projects\\\\C--Users-ajriz-Documents-Projects-keep-track-time-track\\\\70cc0c48-a7d6-45a2-b100-555a05f81652\\\\tool-results\\\\webfetch-1780760614637-6wp77m.bin\"; $outPath = \"$env:TEMP\\\\design_out.html\"; $inputStream = [System.IO.File]::OpenRead\\($gzipPath\\); $gzStream = New-Object System.IO.Compression.GzipStream\\($inputStream, [System.IO.Compression.CompressionMode]::Decompress\\); $outStream = [System.IO.File]::Create\\($outPath\\); $gzStream.CopyTo\\($outStream\\); $gzStream.Close\\(\\); $outStream.Close\\(\\); $inputStream.Close\\(\\); Write-Host \"Done. Size: $\\(\\(Get-Item $outPath\\).Length\\) bytes\")",
+      "PowerShell(Write-Host $env:TEMP)",
+      "PowerShell(New-Item *)",
+      "Bash(flutter clean *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)"
     ]
   }
 }

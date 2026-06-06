@@ -43,6 +43,7 @@ class WindowService {
     // ignored when the target is smaller than the full-mode minimum (800×600).
     await windowManager.setMinimumSize(Size.zero);
     await windowManager.setResizable(false);
+    await windowManager.setMaximizable(false);
     await windowManager.setAsFrameless();
     await windowManager.setSize(AppStyling.miniWindowSize);
     await windowManager.setAlwaysOnTop(true);
@@ -61,6 +62,7 @@ class WindowService {
     await windowManager.setAlwaysOnTop(false);
     await windowManager.setSkipTaskbar(false);
     await windowManager.setResizable(true);
+    await windowManager.setMaximizable(true);
     await windowManager.setMinimumSize(AppStyling.fullWindowMinSize);
     await windowManager.setSize(AppStyling.fullWindowSize);
     await windowManager.center();

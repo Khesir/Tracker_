@@ -7,6 +7,8 @@ import '../theme/app_styling.dart';
 import '../theme/app_theme.dart';
 import '../window/window_service.dart';
 import '../di/service_locator.dart';
+import '../media/media_info.dart';
+import '../media/media_service.dart';
 import '../../features/timer/domain/controller/timer_controller.dart';
 import '../../features/timer/presentation/state/timer_ui_state.dart';
 
@@ -34,15 +36,31 @@ class DesktopTitleBar extends StatelessWidget {
           Row(
             children: [
               const SizedBox(width: 14),
-              Text(
-                'trackr_',
-                style: spaceMono(
-                  size: 13,
-                  weight: FontWeight.w700,
-                  color: isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight,
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'trackr',
+                      style: spaceMono(
+                        size: 14,
+                        weight: FontWeight.w800,
+                        color: isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight,
+                      ),
+                    ),
+                    TextSpan(
+                      text: '_',
+                      style: spaceMono(
+                        size: 14,
+                        weight: FontWeight.w800,
+                        color: isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const _LiveIndicator(),
+              const SizedBox(width: 12),
+              const _NowPlayingIndicator(),
               const Spacer(),
               _MiniModeButton(isDark: isDark),
               const SizedBox(width: 4),
@@ -130,6 +148,68 @@ class _LiveIndicatorState extends State<_LiveIndicator>
           Text(label, style: spaceMono(size: 10, color: color)),
         ],
       ),
+    );
+  }
+}
+
+class _NowPlayingIndicator extends StatefulWidget {
+  const _NowPlayingIndicator();
+
+  @override
+  State<_NowPlayingIndicator> createState() => _NowPlayingIndicatorState();
+}
+
+class _NowPlayingIndicatorState extends State<_NowPlayingIndicator> {
+  late final MediaService _media;
+  late final StreamSubscription<MediaInfo> _sub;
+  late MediaInfo _info;
+
+  @override
+  void initState() {
+    super.initState();
+    _media = locator.get<MediaService>();
+    _info = _media.current;
+    _sub = _media.stream.listen((info) {
+      if (mounted) setState(() => _info = info);
+    });
+    _media.requestSnapshot();
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_info.hasTrack) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+    final muted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          _info.isPlaying ? Icons.graphic_eq_rounded : Icons.music_note_rounded,
+          size: 11,
+          color: _info.isPlaying ? accent : muted,
+        ),
+        const SizedBox(width: 5),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 180),
+          child: Text(
+            _info.isPlaying
+                ? '${_info.title} · ${_info.artist}'
+                : _info.title,
+            style: spaceMono(
+              size: 9.5,
+              color: _info.isPlaying ? accent : muted,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

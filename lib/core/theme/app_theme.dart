@@ -31,7 +31,7 @@ class AppTheme {
       ),
       dividerColor: border,
       cardColor: surface,
-      textTheme: GoogleFonts.dmSansTextTheme(
+      textTheme: GoogleFonts.jetBrainsMonoTextTheme(
         TextTheme(
           displayLarge: TextStyle(color: textPrimary),
           bodyLarge: TextStyle(color: textPrimary, fontSize: AppStyling.bodySize),
@@ -49,7 +49,12 @@ TextStyle spaceMono({
   FontWeight weight = FontWeight.w400,
   Color? color,
 }) {
-  return GoogleFonts.spaceMono(fontSize: size, fontWeight: weight, color: color);
+  return GoogleFonts.jetBrainsMono(
+    fontSize: size,
+    fontWeight: weight,
+    color: color,
+    decoration: TextDecoration.none,
+  );
 }
 
 TextStyle dmSans({
@@ -57,5 +62,10 @@ TextStyle dmSans({
   FontWeight weight = FontWeight.w400,
   Color? color,
 }) {
-  return GoogleFonts.dmSans(fontSize: size, fontWeight: weight, color: color);
+  return GoogleFonts.jetBrainsMono(
+    fontSize: size,
+    fontWeight: weight,
+    color: color,
+    decoration: TextDecoration.none,
+  );
 }

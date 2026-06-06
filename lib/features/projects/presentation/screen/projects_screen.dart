@@ -11,9 +11,7 @@ import '../../../sessions/domain/controller/sessions_controller.dart';
 import '../../../timer/domain/controller/timer_controller.dart';
 import '../../domain/controller/projects_controller.dart';
 import '../dialogs/project_form_dialog.dart';
-import '../widget/active_session_header_widget.dart';
 import '../widget/project_card_widget.dart';
-import '../widget/stat_card_widget.dart';
 
 class ProjectsScreen extends ScopedScreen {
   const ProjectsScreen({super.key});
@@ -58,8 +56,6 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
     _controller.load();
   }
 
-  // ── metric helpers ────────────────────────────────────────────────────────
-
   Map<String, int> _perProjectSeconds(List<SessionModel> sessions) {
     final map = <String, int>{};
     for (final s in sessions) {
@@ -78,40 +74,19 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
         .fold(0, (acc, s) => acc + s.durationSeconds);
   }
 
-  int _weeklySeconds(List<SessionModel> sessions) {
-    final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final cutoff = DateTime(weekStart.year, weekStart.month, weekStart.day);
+  int _thisYearSeconds(List<SessionModel> sessions) {
+    final year = DateTime.now().year;
     return sessions
-        .where((s) => s.startedAt.isAfter(cutoff))
+        .where((s) => s.startedAt.year == year)
         .fold(0, (acc, s) => acc + s.durationSeconds);
-  }
-
-  int _streak(List<SessionModel> sessions) {
-    if (sessions.isEmpty) return 0;
-    final days = sessions
-        .map((s) => DateTime(s.startedAt.year, s.startedAt.month, s.startedAt.day))
-        .toSet();
-    final now = DateTime.now();
-    var check = DateTime(now.year, now.month, now.day);
-    var count = 0;
-    while (days.contains(check)) {
-      count++;
-      check = check.subtract(const Duration(days: 1));
-    }
-    return count;
   }
 
   String _topProject(
     List<SessionModel> sessions,
     List<ProjectModel> projects,
   ) {
-    final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final cutoff = DateTime(weekStart.year, weekStart.month, weekStart.day);
-    final weekly = sessions.where((s) => s.startedAt.isAfter(cutoff));
     final map = <String, int>{};
-    for (final s in weekly) {
+    for (final s in sessions) {
       map[s.projectId] = (map[s.projectId] ?? 0) + s.durationSeconds;
     }
     if (map.isEmpty) return '—';
@@ -138,7 +113,6 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
       backgroundColor: bg,
       body: Column(
         children: [
-          const ActiveSessionHeaderWidget(),
           Expanded(
             child: StreamStateBuilder<AsyncState<List<SessionModel>>>(
               state: _sessions.uiState,
@@ -148,8 +122,7 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                     : <SessionModel>[];
                 final perProject = _perProjectSeconds(sessions);
                 final todaySec = _todaySeconds(sessions);
-                final weeklySec = _weeklySeconds(sessions);
-                final streakDays = _streak(sessions);
+                final yearSec = _thisYearSeconds(sessions);
 
                 return AsyncStreamBuilder<List<ProjectModel>>(
                   state: _controller.uiState,
@@ -161,7 +134,6 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
 
                     return CustomScrollView(
                       slivers: [
-                        // // projects header
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
@@ -171,19 +143,32 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                                   return const SizedBox.shrink();
                                 }
                                 return Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Flexible(
-                                      child: Text(
-                                        '// projects',
-                                        style: spaceMono(size: 10, color: textMuted),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                    Text(
+                                      '// all projects',
+                                      style: spaceMono(size: 10, color: textMuted),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    const Spacer(),
-                                    _NewProjectButton(
-                                      isDark: isDark,
-                                      accent: accent,
-                                      onTap: _openCreateDialog,
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _HeaderButton(
+                                          isDark: isDark,
+                                          accent: accent,
+                                          label: 'import_',
+                                          icon: Icons.upload_outlined,
+                                          onTap: () {},
+                                        ),
+                                        const SizedBox(width: 6),
+                                        _HeaderButton(
+                                          isDark: isDark,
+                                          accent: accent,
+                                          label: 'new_',
+                                          icon: Icons.add,
+                                          onTap: _openCreateDialog,
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 );
@@ -192,7 +177,63 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                           ),
                         ),
 
-                        // project cards or empty state
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _StatCard(
+                                    value: _fmtHours(todaySec),
+                                    label: 'today',
+                                    isDark: isDark,
+                                    isHot: true,
+                                  ),
+                                ),
+                                const SizedBox(width: AppStyling.cardGap),
+                                Expanded(
+                                  child: _StatCard(
+                                    value: _fmtHours(yearSec),
+                                    label: 'this year',
+                                    isDark: isDark,
+                                    isHot: false,
+                                  ),
+                                ),
+                                const SizedBox(width: AppStyling.cardGap),
+                                Expanded(
+                                  child: _StatCard(
+                                    value: '${active.length}',
+                                    label: 'projects',
+                                    isDark: isDark,
+                                    isHot: false,
+                                    hideUnit: true,
+                                  ),
+                                ),
+                                const SizedBox(width: AppStyling.cardGap),
+                                Expanded(
+                                  child: _StatCard(
+                                    value: top,
+                                    label: 'top project',
+                                    isDark: isDark,
+                                    isHot: false,
+                                    hideUnit: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                            child: Text(
+                              '// tracked',
+                              style: spaceMono(size: 10, color: textMuted),
+                            ),
+                          ),
+                        ),
+
                         if (active.isEmpty)
                           SliverToBoxAdapter(
                             child: _EmptyState(
@@ -202,7 +243,7 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                           )
                         else
                           SliverPadding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                             sliver: SliverList.separated(
                               itemCount: active.length,
                               separatorBuilder: (_, __) =>
@@ -222,69 +263,6 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                               },
                             ),
                           ),
-
-                        // // metrics header
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                            child: Text(
-                              '// metrics',
-                              style: spaceMono(size: 10, color: textMuted),
-                            ),
-                          ),
-                        ),
-
-                        // 2x2 stat grid
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: StatCardWidget(
-                                        value: _fmtHours(todaySec),
-                                        label: 'today',
-                                        highlighted: todaySec > 0,
-                                      ),
-                                    ),
-                                    const SizedBox(width: AppStyling.cardGap),
-                                    Expanded(
-                                      child: StatCardWidget(
-                                        value: _fmtHours(weeklySec),
-                                        label: 'this week',
-                                        highlighted: weeklySec > 0,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: AppStyling.cardGap),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: StatCardWidget(
-                                        value: streakDays > 0
-                                            ? '${streakDays}d'
-                                            : '—',
-                                        label: 'streak',
-                                        highlighted: streakDays > 1,
-                                      ),
-                                    ),
-                                    const SizedBox(width: AppStyling.cardGap),
-                                    Expanded(
-                                      child: StatCardWidget(
-                                        value: top,
-                                        label: 'top project',
-                                        highlighted: top != '—',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                       ],
                     );
                   },
@@ -307,22 +285,111 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
   }
 }
 
-class _NewProjectButton extends StatefulWidget {
+class _StatCard extends StatelessWidget {
+  final String value;
+  final String label;
+  final bool isDark;
+  final bool isHot;
+  final bool hideUnit;
+
+  const _StatCard({
+    required this.value,
+    required this.label,
+    required this.isDark,
+    required this.isHot,
+    this.hideUnit = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = isDark ? AppStyling.borderDark : AppStyling.borderLightStrong;
+    final bg = isHot
+        ? (isDark ? AppStyling.accentDimDark : AppStyling.accentDimLight)
+        : Colors.transparent;
+    final valueColor = isHot
+        ? (isDark ? AppStyling.accentInkDark : AppStyling.accentInkLight)
+        : (isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight);
+    final labelColor = isHot
+        ? (isDark ? AppStyling.accentInkDark : AppStyling.accentInkLight).withValues(alpha: 0.8)
+        : (isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight);
+
+    String mainValue = value;
+    String unit = '';
+    if (!hideUnit && value.isNotEmpty) {
+      if (value.endsWith('h')) {
+        mainValue = value.substring(0, value.length - 1);
+        unit = 'h';
+      } else if (value.endsWith('m')) {
+        mainValue = value.substring(0, value.length - 1);
+        unit = 'm';
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(15, 14, 15, 14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RichText(
+            overflow: TextOverflow.ellipsis,
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: mainValue,
+                  style: spaceMono(
+                    size: 21,
+                    weight: FontWeight.w800,
+                    color: valueColor,
+                  ),
+                ),
+                if (unit.isNotEmpty)
+                  TextSpan(
+                    text: unit,
+                    style: spaceMono(
+                      size: 13,
+                      weight: FontWeight.w400,
+                      color: valueColor.withValues(alpha: 0.5),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: spaceMono(size: 10, color: labelColor),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderButton extends StatefulWidget {
   final bool isDark;
   final Color accent;
+  final String label;
+  final IconData icon;
   final VoidCallback onTap;
 
-  const _NewProjectButton({
+  const _HeaderButton({
     required this.isDark,
     required this.accent,
+    required this.label,
+    required this.icon,
     required this.onTap,
   });
 
   @override
-  State<_NewProjectButton> createState() => _NewProjectButtonState();
+  State<_HeaderButton> createState() => _HeaderButtonState();
 }
 
-class _NewProjectButtonState extends State<_NewProjectButton> {
+class _HeaderButtonState extends State<_HeaderButton> {
   bool _hovered = false;
 
   @override
@@ -349,9 +416,9 @@ class _NewProjectButtonState extends State<_NewProjectButton> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.add, size: 13, color: widget.accent),
+              Icon(widget.icon, size: 13, color: widget.accent),
               const SizedBox(width: 5),
-              Text('new_', style: spaceMono(size: 10, color: widget.accent)),
+              Text(widget.label, style: spaceMono(size: 10, color: widget.accent)),
             ],
           ),
         ),

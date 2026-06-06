@@ -24,6 +24,9 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
   }
 
   @override
+  Future<List<SessionModel>> getAllSessions() => _datasource.getAll();
+
+  @override
   Future<Map<String, int>> getProjectTotalsForPeriod(DateTime from, DateTime to) async {
     final all = await _datasource.getAll();
     final inRange = all.where((s) =>
