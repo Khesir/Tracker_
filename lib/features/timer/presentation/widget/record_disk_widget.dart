@@ -1,18 +1,19 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 const _kAccentGreen = Color(0xFF16C172);
 
 class RecordDiskWidget extends StatefulWidget {
   final bool isSpinning;
-  final String? albumArtUrl;
+  final Uint8List? albumArtBytes;
   final double size;
 
   const RecordDiskWidget({
     super.key,
     required this.isSpinning,
-    this.albumArtUrl,
-    this.size = 90,
+    this.albumArtBytes,
+    required this.size,
   });
 
   @override
@@ -56,7 +57,7 @@ class _RecordDiskWidgetState extends State<RecordDiskWidget>
       builder: (_, __) => Transform.rotate(
         angle: _spin.value * 2 * math.pi,
         child: _DiskFace(
-          albumArtUrl: widget.albumArtUrl,
+          albumArtBytes: widget.albumArtBytes,
           size: widget.size,
         ),
       ),
@@ -65,22 +66,33 @@ class _RecordDiskWidgetState extends State<RecordDiskWidget>
 }
 
 class _DiskFace extends StatelessWidget {
-  final String? albumArtUrl;
+  final Uint8List? albumArtBytes;
   final double size;
 
-  const _DiskFace({this.albumArtUrl, required this.size});
+  const _DiskFace({this.albumArtBytes, required this.size});
 
   @override
   Widget build(BuildContext context) {
-    final labelSize = size * 0.30;
+    final labelSize = size * 0.70;
 
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(
-        painter: const _VinylPainter(),
-        child: Center(
-          child: Container(
+    final Widget label = albumArtBytes != null
+        ? Container(
+            width: labelSize,
+            height: labelSize,
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(shape: BoxShape.circle),
+            child: OverflowBox(
+              alignment: Alignment.topCenter,
+              maxHeight: labelSize * 1.3,
+              child: Image.memory(
+                albumArtBytes!,
+                fit: BoxFit.cover,
+                width: labelSize,
+                height: labelSize * 1.3,
+              ),
+            ),
+          )
+        : Container(
             width: labelSize,
             height: labelSize,
             decoration: const BoxDecoration(
@@ -92,16 +104,15 @@ class _DiskFace extends StatelessWidget {
                 stops: [0.0, 0.52, 1.0],
               ),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: albumArtUrl != null
-                ? Image.network(
-                    albumArtUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const _DefaultLabel(),
-                  )
-                : const _DefaultLabel(),
-          ),
-        ),
+            child: const _DefaultLabel(),
+          );
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: const _VinylPainter(),
+        child: Center(child: label),
       ),
     );
   }
@@ -138,7 +149,6 @@ class _VinylPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final maxR = size.width / 2;
 
-    // Base disc: dark radial gradient
     final basePaint = Paint()
       ..shader = RadialGradient(
         colors: [const Color(0xFF1A1D26), const Color(0xFF0B0B0F), const Color(0xFF050507)],
@@ -146,7 +156,6 @@ class _VinylPainter extends CustomPainter {
       ).createShader(Rect.fromCircle(center: center, radius: maxR));
     canvas.drawCircle(center, maxR, basePaint);
 
-    // Groove rings
     final groovePaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.05)
       ..style = PaintingStyle.stroke
@@ -157,7 +166,6 @@ class _VinylPainter extends CustomPainter {
       canvas.drawCircle(center, r, groovePaint);
     }
 
-    // Gloss highlight
     final glossPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment(-0.7, -0.7),

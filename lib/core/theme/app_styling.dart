@@ -46,9 +46,10 @@ class AppStyling {
   // ── Window sizes ──────────────────────────────────────────────
   static const Size fullWindowSize = Size(980, 700);
   static const Size fullWindowMinSize = Size(800, 600);
-  static const Size miniCardSize = Size(270, 104);
-  static const Size miniCardNoteSize = Size(270, 272);
-  static const Size miniPillSize = Size(200, 58);
+  static const Size miniCardSize = Size(296, 146);
+  static const Size miniCardNoteSize = Size(296, 314);
+  static const Size miniCardPickerSize = Size(296, 286);
+  static const Size miniPillSize = Size(214, 72);
 
   // kept for compatibility
   static const Size miniWindowSize = miniCardSize;

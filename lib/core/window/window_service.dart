@@ -34,11 +34,15 @@ class WindowService {
 
   Future<void> enterMiniMode() async {
     if (isMiniMode) return;
+    // Switch widget tree to TimerScreen before resizing so the full app shell
+    // is never laid out at the mini window dimensions.
+    _emit(WindowMode.mini);
     await windowManager.setBackgroundColor(Colors.transparent);
     // Clear minimum size before shrinking — otherwise setSize is silently
     // ignored when the target is smaller than the full-mode minimum (800×600).
     await windowManager.setMinimumSize(Size.zero);
     await windowManager.setResizable(false);
+    await windowManager.setAsFrameless();
     await windowManager.setSize(AppStyling.miniWindowSize);
     await windowManager.setAlwaysOnTop(true);
     await windowManager.setSkipTaskbar(true);
@@ -48,8 +52,6 @@ class WindowService {
     final screen = WidgetsBinding.instance.platformDispatcher.views.first;
     final screenW = screen.physicalSize.width / screen.devicePixelRatio;
     await windowManager.setPosition(Offset(screenW - AppStyling.miniWindowSize.width - 24, 26));
-
-    _emit(WindowMode.mini);
   }
 
   Future<void> exitMiniMode() async {

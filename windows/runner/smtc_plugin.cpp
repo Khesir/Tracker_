@@ -2,14 +2,19 @@
 
 #include <windows.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Media.Control.h>
+#include <winrt/Windows.Storage.Streams.h>
 
+#include <algorithm>
 #include <chrono>
 #include <string>
+#include <vector>
 
 namespace {
 
 using namespace winrt::Windows::Media::Control;
+using namespace winrt::Windows::Storage::Streams;
 
 std::string ToUtf8(const winrt::hstring& s) {
   if (s.empty()) return {};
@@ -22,7 +27,39 @@ std::string ToUtf8(const winrt::hstring& s) {
   return out;
 }
 
-// StreamHandler subclass bridges EventChannel listen/cancel to SmtcPlugin.
+GlobalSystemMediaTransportControlsSession FindSpotifySession(
+    GlobalSystemMediaTransportControlsSessionManager const& manager) {
+  for (auto const& session : manager.GetSessions()) {
+    std::string id = ToUtf8(session.SourceAppUserModelId());
+    std::string lower = id;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(::tolower(c)); });
+    if (lower.find("spotify") != std::string::npos) {
+      return session;
+    }
+  }
+  return {nullptr};
+}
+
+std::vector<uint8_t> ReadThumbnailBytes(
+    GlobalSystemMediaTransportControlsSessionMediaProperties const& props) {
+  try {
+    auto ref = props.Thumbnail();
+    if (!ref) return {};
+    auto stream = ref.OpenReadAsync().get();
+    auto size = static_cast<uint32_t>(stream.Size());
+    if (size == 0 || size > 5 * 1024 * 1024) return {};
+    DataReader reader(stream);
+    reader.LoadAsync(size).get();
+    std::vector<uint8_t> bytes(size);
+    reader.ReadBytes(bytes);
+    reader.DetachStream();
+    return bytes;
+  } catch (...) {
+    return {};
+  }
+}
+
 class SmtcStreamHandler
     : public flutter::StreamHandler<flutter::EncodableValue> {
  public:
@@ -105,7 +142,7 @@ void SmtcPlugin::HandleMethodCall(
         auto manager =
             GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
                 .get();
-        auto session = manager.GetCurrentSession();
+        auto session = FindSpotifySession(manager);
         if (session) action_fn(session);
       } catch (...) {
       }
@@ -141,13 +178,14 @@ void SmtcPlugin::PollLoop() {
   std::string last_artist;
   bool last_playing = false;
   bool last_has_session = false;
+  std::vector<uint8_t> last_art;
 
   while (!stop_flag_) {
     try {
       auto manager =
           GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
               .get();
-      auto session = manager.GetCurrentSession();
+      auto session = FindSpotifySession(manager);
 
       if (!session) {
         if (last_has_session) {
@@ -160,12 +198,15 @@ void SmtcPlugin::PollLoop() {
                 flutter::EncodableValue(std::string{});
             map[flutter::EncodableValue("isPlaying")] =
                 flutter::EncodableValue(false);
+            map[flutter::EncodableValue("albumArtBytes")] =
+                flutter::EncodableValue(std::vector<uint8_t>{});
             event_sink_->Success(flutter::EncodableValue(map));
           }
           last_has_session = false;
           last_title.clear();
           last_artist.clear();
           last_playing = false;
+          last_art.clear();
         }
       } else {
         auto props = session.TryGetMediaPropertiesAsync().get();
@@ -176,6 +217,10 @@ void SmtcPlugin::PollLoop() {
         bool is_playing =
             playback.PlaybackStatus() ==
             GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing;
+
+        if (props && title != last_title) {
+          last_art = ReadThumbnailBytes(props);
+        }
 
         if (!last_has_session || title != last_title ||
             artist != last_artist || is_playing != last_playing) {
@@ -188,6 +233,8 @@ void SmtcPlugin::PollLoop() {
                 flutter::EncodableValue(artist);
             map[flutter::EncodableValue("isPlaying")] =
                 flutter::EncodableValue(is_playing);
+            map[flutter::EncodableValue("albumArtBytes")] =
+                flutter::EncodableValue(last_art);
             event_sink_->Success(flutter::EncodableValue(map));
           }
           last_title = title;
@@ -197,7 +244,6 @@ void SmtcPlugin::PollLoop() {
         }
       }
     } catch (...) {
-      // SMTC unavailable or access denied — skip.
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));

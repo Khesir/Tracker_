@@ -165,22 +165,29 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                            child: Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    '// projects',
-                                    style: spaceMono(size: 10, color: textMuted),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const Spacer(),
-                                _NewProjectButton(
-                                  isDark: isDark,
-                                  accent: accent,
-                                  onTap: _openCreateDialog,
-                                ),
-                              ],
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                if (constraints.maxWidth < 80) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        '// projects',
+                                        style: spaceMono(size: 10, color: textMuted),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    _NewProjectButton(
+                                      isDark: isDark,
+                                      accent: accent,
+                                      onTap: _openCreateDialog,
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         ),

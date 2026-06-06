@@ -81,36 +81,41 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: Color(
-                        int.parse(widget.project.colorHex.replaceFirst('#', '0xFF')),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 115) return const SizedBox.shrink();
+                  return Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Color(
+                            int.parse(widget.project.colorHex.replaceFirst('#', '0xFF')),
+                          ),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.project.name,
-                      style: spaceMono(
-                        size: 12,
-                        weight: FontWeight.w700,
-                        color: textPrimary,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.project.name,
+                          style: spaceMono(
+                            size: 12,
+                            weight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  _StatusBadge(status: _status, isDark: isDark),
-                  if (!widget.isActive) ...[
-                    const SizedBox(width: 8),
-                    _StartButton(isDark: isDark, onTap: widget.onStart),
-                  ],
-                ],
+                      _StatusBadge(status: _status, isDark: isDark),
+                      if (!widget.isActive) ...[
+                        const SizedBox(width: 8),
+                        _StartButton(isDark: isDark, onTap: widget.onStart),
+                      ],
+                    ],
+                  );
+                },
               ),
               if (widget.loggedSeconds > 0 || hasTarget) ...[
                 const SizedBox(height: 8),

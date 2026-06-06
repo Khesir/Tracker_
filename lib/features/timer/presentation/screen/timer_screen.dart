@@ -4,13 +4,16 @@ import 'package:window_manager/window_manager.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/media/media_info.dart';
 import '../../../../core/media/media_service.dart';
+import '../../../../core/models/project_model.dart';
 import '../../../../core/state/stream_builder_widget.dart';
+import '../../../../core/state/stream_state.dart';
 import '../../../../core/theme/app_styling.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/window/window_service.dart';
 import '../../domain/controller/timer_controller.dart';
 import '../state/timer_ui_state.dart';
 import '../widget/record_disk_widget.dart';
+import '../../../projects/domain/controller/projects_controller.dart';
 
 // Design tokens — this widget is always light (white card over desktop)
 const _kAccent = Color(0xFF16C172);
@@ -19,8 +22,6 @@ const _kMuted = Color(0xFF9AA0AB);
 const _kLine = Color(0xFFE9EAEE);
 const _kCardBg = Color(0xFFFAFAFA);
 
-// Layout: vinyl overhangs 25px past the card's left edge.
-// We give 30px of left window space so the vinyl (25px overhang) has a 5px gap.
 const double _kCardLeft = 30;
 const double _kCardWidth = 238;
 const double _kVinylCard = 90.0;
@@ -35,28 +36,42 @@ class TimerScreen extends StatefulWidget {
 
 class _TimerScreenState extends State<TimerScreen> {
   late final TimerController _controller;
+  late final ProjectsController _projects;
   late final MediaService _media;
   late final StreamSubscription<MediaInfo> _mediaSub;
+  late final StreamSubscription<dynamic> _projectsSub;
 
   MediaInfo _currentMedia = MediaInfo.none;
+  List<ProjectModel> _projectList = [];
   bool _isPill = false;
   bool _noteOpen = false;
+  bool _pickerOpen = false;
   final _noteCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _controller = locator.get<TimerController>();
+    _projects = locator.get<ProjectsController>();
     _media = locator.get<MediaService>();
     _mediaSub = _media.stream.listen((info) {
       if (mounted) setState(() => _currentMedia = info);
       _controller.onMediaChanged(info);
     });
+    _projectsSub = _projects.uiState.stream.listen((state) {
+      if (!mounted) return;
+      if (state is AsyncData<List<ProjectModel>>) {
+        setState(() => _projectList =
+            state.data.where((p) => !p.isArchived).toList());
+      }
+    });
+    _projects.load();
   }
 
   @override
   void dispose() {
     _mediaSub.cancel();
+    _projectsSub.cancel();
     _noteCtrl.dispose();
     super.dispose();
   }
@@ -65,6 +80,7 @@ class _TimerScreenState extends State<TimerScreen> {
     setState(() {
       _isPill = true;
       _noteOpen = false;
+      _pickerOpen = false;
     });
     await windowManager.setMinimumSize(Size.zero);
     await windowManager.setSize(AppStyling.miniPillSize);
@@ -78,11 +94,39 @@ class _TimerScreenState extends State<TimerScreen> {
 
   Future<void> _toggleNote() async {
     final next = !_noteOpen;
-    setState(() => _noteOpen = next);
+    setState(() {
+      _noteOpen = next;
+      _pickerOpen = false;
+    });
     await windowManager.setMinimumSize(Size.zero);
     await windowManager.setSize(
       next ? AppStyling.miniCardNoteSize : AppStyling.miniCardSize,
     );
+  }
+
+  Future<void> _togglePicker() async {
+    final next = !_pickerOpen;
+    setState(() {
+      _pickerOpen = next;
+      _noteOpen = false;
+    });
+    await windowManager.setMinimumSize(Size.zero);
+    await windowManager.setSize(
+      next ? AppStyling.miniCardPickerSize : AppStyling.miniCardSize,
+    );
+  }
+
+  Future<void> _selectProject(ProjectModel project) async {
+    if (_controller.uiState.state.isRunning) {
+      await _controller.stop();
+    }
+    await _controller.start(
+      projectId: project.id,
+      projectName: project.name,
+    );
+    setState(() => _pickerOpen = false);
+    await windowManager.setMinimumSize(Size.zero);
+    await windowManager.setSize(AppStyling.miniCardSize);
   }
 
   String _fmt(Duration d) {
@@ -107,9 +151,13 @@ class _TimerScreenState extends State<TimerScreen> {
           data: data,
           media: _currentMedia,
           noteOpen: _noteOpen,
+          pickerOpen: _pickerOpen,
+          projects: _projectList,
           noteCtrl: _noteCtrl,
           onNoteChanged: _controller.updateNote,
           onToggleNote: _toggleNote,
+          onTogglePicker: _togglePicker,
+          onSelectProject: _selectProject,
           onCollapse: _collapseToPill,
           onExpand: () => locator.get<WindowService>().exitMiniMode(),
           onPlayPause: _media.playPause,
@@ -128,9 +176,13 @@ class _Card extends StatelessWidget {
   final TimerUiData data;
   final MediaInfo media;
   final bool noteOpen;
+  final bool pickerOpen;
+  final List<ProjectModel> projects;
   final TextEditingController noteCtrl;
   final ValueChanged<String> onNoteChanged;
   final VoidCallback onToggleNote;
+  final VoidCallback onTogglePicker;
+  final ValueChanged<ProjectModel> onSelectProject;
   final VoidCallback onCollapse;
   final VoidCallback onExpand;
   final VoidCallback onPlayPause;
@@ -142,9 +194,13 @@ class _Card extends StatelessWidget {
     required this.data,
     required this.media,
     required this.noteOpen,
+    required this.pickerOpen,
+    required this.projects,
     required this.noteCtrl,
     required this.onNoteChanged,
     required this.onToggleNote,
+    required this.onTogglePicker,
+    required this.onSelectProject,
     required this.onCollapse,
     required this.onExpand,
     required this.onPlayPause,
@@ -154,8 +210,6 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Vinyl: center is 45px from window top (2px card margin + 43px offset).
-    // Vinyl spans y[0..90] in window coords. Left edge at x=5 (30-25=5).
     const vinylLeft = _kCardLeft - 25;
     const vinylTop = 0.0;
 
@@ -174,9 +228,13 @@ class _Card extends StatelessWidget {
             data: data,
             media: media,
             noteOpen: noteOpen,
+            pickerOpen: pickerOpen,
+            projects: projects,
             noteCtrl: noteCtrl,
             onNoteChanged: onNoteChanged,
             onToggleNote: onToggleNote,
+            onTogglePicker: onTogglePicker,
+            onSelectProject: onSelectProject,
             onCollapse: onCollapse,
             onExpand: onExpand,
             onPlayPause: onPlayPause,
@@ -190,25 +248,10 @@ class _Card extends StatelessWidget {
           top: vinylTop,
           child: RecordDiskWidget(
             isSpinning: media.isPlaying,
-            albumArtUrl: media.albumArtUrl,
+            albumArtBytes: media.albumArtBytes,
             size: _kVinylCard,
           ),
         ),
-        // Anchor label below vinyl (hidden when note is open)
-        if (!noteOpen)
-          Positioned(
-            left: vinylLeft,
-            top: vinylTop + _kVinylCard + 4,
-            width: _kVinylCard,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.anchor_rounded, size: 8, color: _kMuted),
-                const SizedBox(width: 3),
-                Text('anchor_', style: spaceMono(size: 8, color: _kMuted)),
-              ],
-            ),
-          ),
       ],
     );
   }
@@ -219,9 +262,13 @@ class _CardBox extends StatelessWidget {
   final TimerUiData data;
   final MediaInfo media;
   final bool noteOpen;
+  final bool pickerOpen;
+  final List<ProjectModel> projects;
   final TextEditingController noteCtrl;
   final ValueChanged<String> onNoteChanged;
   final VoidCallback onToggleNote;
+  final VoidCallback onTogglePicker;
+  final ValueChanged<ProjectModel> onSelectProject;
   final VoidCallback onCollapse;
   final VoidCallback onExpand;
   final VoidCallback onPlayPause;
@@ -233,9 +280,13 @@ class _CardBox extends StatelessWidget {
     required this.data,
     required this.media,
     required this.noteOpen,
+    required this.pickerOpen,
+    required this.projects,
     required this.noteCtrl,
     required this.onNoteChanged,
     required this.onToggleNote,
+    required this.onTogglePicker,
+    required this.onSelectProject,
     required this.onCollapse,
     required this.onExpand,
     required this.onPlayPause,
@@ -245,10 +296,6 @@ class _CardBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusText = data.isRunning
-        ? 'tracking ${data.projectName ?? 'session'}'
-        : (data.projectName != null ? 'paused · ${data.projectName}' : 'no_session');
-
     return Container(
       decoration: BoxDecoration(
         color: _kCardBg,
@@ -288,6 +335,13 @@ class _CardBox extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Project title
+                      Text(
+                        data.projectName ?? 'no session',
+                        style: spaceMono(size: 8, color: _kMuted),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
                       // Timer
                       RichText(
                         text: TextSpan(
@@ -301,14 +355,19 @@ class _CardBox extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 5),
-                      // Status
-                      Text(
-                        statusText,
-                        style: spaceMono(size: 9.5, color: _kMuted),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 3),
+                      // Now playing
+                      if (media.hasTrack)
+                        _MarqueeText(
+                          text: 'now playing · ${media.title}',
+                          style: spaceMono(size: 8.5, color: _kAccent),
+                        )
+                      else
+                        Text(
+                          'not playing',
+                          style: spaceMono(size: 8.5, color: _kMuted),
+                        ),
+                      const SizedBox(height: 6),
                       // Transport row
                       Row(
                         children: [
@@ -343,10 +402,16 @@ class _CardBox extends StatelessWidget {
                 top: 6,
                 right: 7,
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    _WinBtn(
+                      icon: Icons.folder_open_rounded,
+                      tooltip: 'switch project',
+                      onTap: onTogglePicker,
+                      isActive: pickerOpen,
+                    ),
+                    const SizedBox(width: 2),
                     _WinBtn(icon: Icons.open_in_full_rounded, tooltip: 'expand', onTap: onExpand),
-                    const SizedBox(width: 1),
-                    _WinBtn(icon: Icons.remove_rounded, tooltip: 'minimize', onTap: onCollapse),
                   ],
                 ),
               ),
@@ -354,6 +419,12 @@ class _CardBox extends StatelessWidget {
           ),
           // Note panel
           if (noteOpen) _NotePanel(controller: noteCtrl, onChanged: onNoteChanged),
+          // Project picker panel
+          if (pickerOpen) _ProjectPicker(
+            projects: projects,
+            activeProjectId: data.projectId,
+            onSelect: onSelectProject,
+          ),
         ],
       ),
     );
@@ -431,7 +502,7 @@ class _Pill extends StatelessWidget {
           top: vinylTop,
           child: RecordDiskWidget(
             isSpinning: media.isPlaying,
-            albumArtUrl: media.albumArtUrl,
+            albumArtBytes: media.albumArtBytes,
             size: _kVinylPill,
           ),
         ),
@@ -488,6 +559,123 @@ class _NotePanel extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Project picker panel ──────────────────────────────────────────────────────
+
+class _ProjectPicker extends StatelessWidget {
+  final List<ProjectModel> projects;
+  final String? activeProjectId;
+  final ValueChanged<ProjectModel> onSelect;
+
+  const _ProjectPicker({
+    required this.projects,
+    required this.activeProjectId,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(height: 1, color: _kLine),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 140),
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            shrinkWrap: true,
+            itemCount: projects.length,
+            itemBuilder: (_, i) {
+              final p = projects[i];
+              final isActive = p.id == activeProjectId;
+              return _ProjectRow(
+                project: p,
+                isActive: isActive,
+                onTap: () => onSelect(p),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectRow extends StatefulWidget {
+  final ProjectModel project;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _ProjectRow({
+    required this.project,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  State<_ProjectRow> createState() => _ProjectRowState();
+}
+
+class _ProjectRowState extends State<_ProjectRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Color(
+      int.parse('FF${widget.project.colorHex.replaceFirst('#', '')}', radix: 16),
+    );
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          color: _hovered
+              ? Colors.black.withValues(alpha: 0.04)
+              : Colors.transparent,
+          child: Row(
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  widget.project.name,
+                  style: spaceMono(
+                    size: 9,
+                    color: widget.isActive ? _kInk : _kMuted,
+                    weight: widget.isActive ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (widget.isActive)
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _kAccent,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -551,8 +739,14 @@ class _WinBtn extends StatefulWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
+  final bool isActive;
 
-  const _WinBtn({required this.icon, required this.tooltip, required this.onTap});
+  const _WinBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.isActive = false,
+  });
 
   @override
   State<_WinBtn> createState() => _WinBtnState();
@@ -575,18 +769,117 @@ class _WinBtnState extends State<_WinBtn> {
             width: 22,
             height: 20,
             decoration: BoxDecoration(
-              color: _hovered
-                  ? Colors.black.withValues(alpha: 0.06)
-                  : Colors.transparent,
+              color: widget.isActive
+                  ? _kAccent.withValues(alpha: 0.12)
+                  : _hovered
+                      ? Colors.black.withValues(alpha: 0.06)
+                      : Colors.transparent,
               borderRadius: BorderRadius.circular(6),
             ),
             alignment: Alignment.center,
             child: Icon(
               widget.icon,
               size: 12,
-              color: _hovered ? _kInk : const Color(0xFFB0B5BD),
+              color: widget.isActive
+                  ? _kAccent
+                  : _hovered
+                      ? _kInk
+                      : const Color(0xFFB0B5BD),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Marquee ───────────────────────────────────────────────────────────────────
+
+class _MarqueeText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+
+  const _MarqueeText({required this.text, required this.style});
+
+  @override
+  State<_MarqueeText> createState() => _MarqueeTextState();
+}
+
+class _MarqueeTextState extends State<_MarqueeText>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  double _textWidth = 0;
+  double _lineHeight = 12;
+
+  static const double _gap = 36.0;
+  static const double _speed = 38.0; // px per second
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  @override
+  void didUpdateWidget(_MarqueeText old) {
+    super.didUpdateWidget(old);
+    if (old.text != widget.text) {
+      _ctrl.stop();
+      _ctrl.reset();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+    }
+  }
+
+  void _start() {
+    if (!mounted) return;
+    final tp = TextPainter(
+      text: TextSpan(text: widget.text, style: widget.style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    _textWidth = tp.width;
+    _lineHeight = tp.height;
+    if (_textWidth <= 0) return;
+    _ctrl.duration = Duration(
+      milliseconds: ((_textWidth + _gap) / _speed * 1000).round(),
+    );
+    _ctrl.repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_textWidth == 0) {
+      return Text(widget.text, style: widget.style, maxLines: 1);
+    }
+    return SizedBox(
+      height: _lineHeight,
+      child: ClipRect(
+        child: AnimatedBuilder(
+          animation: _ctrl,
+          builder: (_, __) {
+            final offset = _ctrl.value * (_textWidth + _gap);
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  top: 0,
+                  left: -offset,
+                  child: Text(widget.text, style: widget.style),
+                ),
+                Positioned(
+                  top: 0,
+                  left: _textWidth + _gap - offset,
+                  child: Text(widget.text, style: widget.style),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

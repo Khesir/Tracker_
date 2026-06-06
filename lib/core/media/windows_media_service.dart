@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'media_info.dart';
 import 'media_service.dart';
@@ -25,11 +26,14 @@ class WindowsMediaService implements MediaService {
         final title = (event['title'] as String?) ?? '';
         final artist = (event['artist'] as String?) ?? '';
         final isPlaying = (event['isPlaying'] as bool?) ?? false;
+        final rawArt = event['albumArtBytes'];
+        final albumArtBytes =
+            (rawArt is Uint8List && rawArt.isNotEmpty) ? rawArt : null;
         _current = MediaInfo(
           title: title,
           artist: artist,
           isPlaying: isPlaying,
-          albumArtUrl: null,
+          albumArtBytes: albumArtBytes,
         );
         _controller.add(_current);
       },

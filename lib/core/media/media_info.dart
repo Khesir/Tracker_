@@ -1,13 +1,15 @@
+import 'dart:typed_data';
+
 class MediaInfo {
   final String title;
   final String artist;
-  final String? albumArtUrl;
+  final Uint8List? albumArtBytes;
   final bool isPlaying;
 
   const MediaInfo({
     required this.title,
     required this.artist,
-    this.albumArtUrl,
+    this.albumArtBytes,
     required this.isPlaying,
   });
 
@@ -15,11 +17,11 @@ class MediaInfo {
 
   bool get hasTrack => title.isNotEmpty;
 
-  MediaInfo copyWith({String? title, String? artist, String? albumArtUrl, bool? isPlaying}) {
+  MediaInfo copyWith({String? title, String? artist, Uint8List? albumArtBytes, bool? isPlaying}) {
     return MediaInfo(
       title: title ?? this.title,
       artist: artist ?? this.artist,
-      albumArtUrl: albumArtUrl ?? this.albumArtUrl,
+      albumArtBytes: albumArtBytes ?? this.albumArtBytes,
       isPlaying: isPlaying ?? this.isPlaying,
     );
   }
