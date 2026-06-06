@@ -179,6 +179,8 @@ void SmtcPlugin::PollLoop() {
   bool last_playing = false;
   bool last_has_session = false;
   std::vector<uint8_t> last_art;
+  int miss_count = 0;
+  static constexpr int kMissThreshold = 3;
 
   while (!stop_flag_) {
     try {
@@ -189,26 +191,31 @@ void SmtcPlugin::PollLoop() {
 
       if (!session) {
         if (last_has_session) {
-          std::lock_guard<std::mutex> lock(sink_mutex_);
-          if (event_sink_) {
-            flutter::EncodableMap map;
-            map[flutter::EncodableValue("title")] =
-                flutter::EncodableValue(std::string{});
-            map[flutter::EncodableValue("artist")] =
-                flutter::EncodableValue(std::string{});
-            map[flutter::EncodableValue("isPlaying")] =
-                flutter::EncodableValue(false);
-            map[flutter::EncodableValue("albumArtBytes")] =
-                flutter::EncodableValue(std::vector<uint8_t>{});
-            event_sink_->Success(flutter::EncodableValue(map));
+          ++miss_count;
+          if (miss_count >= kMissThreshold) {
+            std::lock_guard<std::mutex> lock(sink_mutex_);
+            if (event_sink_) {
+              flutter::EncodableMap map;
+              map[flutter::EncodableValue("title")] =
+                  flutter::EncodableValue(std::string{});
+              map[flutter::EncodableValue("artist")] =
+                  flutter::EncodableValue(std::string{});
+              map[flutter::EncodableValue("isPlaying")] =
+                  flutter::EncodableValue(false);
+              map[flutter::EncodableValue("albumArtBytes")] =
+                  flutter::EncodableValue(std::vector<uint8_t>{});
+              event_sink_->Success(flutter::EncodableValue(map));
+            }
+            last_has_session = false;
+            last_title.clear();
+            last_artist.clear();
+            last_playing = false;
+            last_art.clear();
+            miss_count = 0;
           }
-          last_has_session = false;
-          last_title.clear();
-          last_artist.clear();
-          last_playing = false;
-          last_art.clear();
         }
       } else {
+        miss_count = 0;
         auto props = session.TryGetMediaPropertiesAsync().get();
         auto playback = session.GetPlaybackInfo();
 

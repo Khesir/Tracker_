@@ -50,10 +50,11 @@ class WindowService {
     await windowManager.setSkipTaskbar(true);
     await windowManager.setHasShadow(false);
 
-    // Place at top-right with a small inset (4px from right edge, 2px from top).
-    final screen = WidgetsBinding.instance.platformDispatcher.views.first;
-    final screenW = screen.physicalSize.width / screen.devicePixelRatio;
-    await windowManager.setPosition(Offset(screenW - AppStyling.miniWindowSize.width - 4, 2));
+    // calcWindowPosition uses screen_retriever for correct multi-monitor aware
+    // screen bounds — avoids the pitfall of views.first.physicalSize which returns
+    // the window size, not the screen size.
+    final topRight = await calcWindowPosition(AppStyling.miniWindowSize, Alignment.topRight);
+    await windowManager.setPosition(Offset(topRight.dx - 4, topRight.dy + 2));
   }
 
   Future<void> exitMiniMode() async {

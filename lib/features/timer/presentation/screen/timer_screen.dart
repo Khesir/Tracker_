@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter_quill/quill_delta.dart';
 import 'package:window_manager/window_manager.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/media/media_info.dart';
 import '../../../../core/media/media_service.dart';
+import '../../../../core/models/app_settings_model.dart';
 import '../../../../core/models/project_model.dart';
 import '../../../../core/state/stream_builder_widget.dart';
 import '../../../../core/state/stream_state.dart';
@@ -12,8 +16,10 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/window/window_service.dart';
 import '../../domain/controller/timer_controller.dart';
 import '../state/timer_ui_state.dart';
+import '../widget/note_panel_widget.dart';
 import '../widget/record_disk_widget.dart';
 import '../../../projects/domain/controller/projects_controller.dart';
+import '../../../settings/domain/controller/settings_controller.dart';
 
 // Design tokens — this widget is always light (white card over desktop)
 const _kAccent = Color(0xFF16C172);
@@ -38,15 +44,21 @@ class _TimerScreenState extends State<TimerScreen> {
   late final TimerController _controller;
   late final ProjectsController _projects;
   late final MediaService _media;
+  late final SettingsController _settings;
   late final StreamSubscription<MediaInfo> _mediaSub;
   late final StreamSubscription<dynamic> _projectsSub;
+  late final StreamSubscription<dynamic> _settingsSub;
 
   MediaInfo _currentMedia = MediaInfo.none;
   List<ProjectModel> _projectList = [];
+  AppSettingsModel _currentSettings = const AppSettingsModel();
   bool _isPill = false;
   bool _noteOpen = false;
   bool _pickerOpen = false;
-  final _noteCtrl = TextEditingController();
+  bool _hovered = false;
+  late final QuillController _quillCtrl;
+  final _noteFocus = FocusNode();
+  final _noteScroll = ScrollController();
 
   @override
   void initState() {
@@ -54,6 +66,9 @@ class _TimerScreenState extends State<TimerScreen> {
     _controller = locator.get<TimerController>();
     _projects = locator.get<ProjectsController>();
     _media = locator.get<MediaService>();
+    _settings = locator.get<SettingsController>();
+    _quillCtrl = _buildQuillController(_controller.currentNoteJson);
+    _quillCtrl.addListener(_onNoteChanged);
     _currentMedia = _media.current;
     _mediaSub = _media.stream.listen((info) {
       debugPrint('[TimerScreen] stream event: title=${info.title} playing=${info.isPlaying}');
@@ -70,14 +85,43 @@ class _TimerScreenState extends State<TimerScreen> {
             state.data.where((p) => !p.isArchived).toList());
       }
     });
+    _settingsSub = _settings.uiState.stream.listen((state) {
+      if (!mounted) return;
+      if (state is AsyncData<AppSettingsModel>) {
+        setState(() => _currentSettings = state.data);
+      }
+    });
+    _settings.load();
     _projects.load();
+  }
+
+  QuillController _buildQuillController(String? noteJson) {
+    if (noteJson == null || noteJson.isEmpty) return QuillController.basic();
+    try {
+      final delta = Delta.fromJson(jsonDecode(noteJson) as List);
+      return QuillController(
+        document: Document.fromDelta(delta),
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+    } catch (_) {
+      return QuillController.basic();
+    }
+  }
+
+  void _onNoteChanged() {
+    final json = jsonEncode(_quillCtrl.document.toDelta().toJson());
+    _controller.updateNote(json);
   }
 
   @override
   void dispose() {
+    _quillCtrl.removeListener(_onNoteChanged);
+    _quillCtrl.dispose();
+    _noteFocus.dispose();
+    _noteScroll.dispose();
     _mediaSub.cancel();
     _projectsSub.cancel();
-    _noteCtrl.dispose();
+    _settingsSub.cancel();
     super.dispose();
   }
 
@@ -143,31 +187,43 @@ class _TimerScreenState extends State<TimerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fadeEnabled = _currentSettings.miniOpacityEnabled;
+    final idleOpacity = _currentSettings.miniIdleOpacity;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: StreamStateBuilder<TimerUiData>(
-        state: _controller.uiState,
-        builder: (context, data) => _isPill ? _Pill(
-          elapsed: _fmt(data.elapsed),
-          media: _currentMedia,
-          onExpand: _expandToCard,
-        ) : _Card(
-          elapsed: _fmt(data.elapsed),
-          data: data,
-          media: _currentMedia,
-          noteOpen: _noteOpen,
-          pickerOpen: _pickerOpen,
-          projects: _projectList,
-          noteCtrl: _noteCtrl,
-          onNoteChanged: _controller.updateNote,
-          onToggleNote: _toggleNote,
-          onTogglePicker: _togglePicker,
-          onSelectProject: _selectProject,
-          onCollapse: _collapseToPill,
-          onExpand: () => locator.get<WindowService>().exitMiniMode(),
-          onPlayPause: _media.playPause,
-          onPrev: _media.skipPrevious,
-          onNext: _media.skipNext,
+      body: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          opacity: fadeEnabled && !_hovered ? idleOpacity : 1.0,
+          child: StreamStateBuilder<TimerUiData>(
+            state: _controller.uiState,
+            builder: (context, data) => _isPill ? _Pill(
+              elapsed: _fmt(data.elapsed),
+              media: _currentMedia,
+              onExpand: _expandToCard,
+            ) : _Card(
+              elapsed: _fmt(data.elapsed),
+              data: data,
+              media: _currentMedia,
+              noteOpen: _noteOpen,
+              pickerOpen: _pickerOpen,
+              projects: _projectList,
+              quillCtrl: _quillCtrl,
+              noteFocus: _noteFocus,
+              noteScroll: _noteScroll,
+              onToggleNote: _toggleNote,
+              onTogglePicker: _togglePicker,
+              onSelectProject: _selectProject,
+              onCollapse: _collapseToPill,
+              onExpand: () => locator.get<WindowService>().exitMiniMode(),
+              onPlayPause: _media.playPause,
+              onPrev: _media.skipPrevious,
+              onNext: _media.skipNext,
+            ),
+          ),
         ),
       ),
     );
@@ -183,8 +239,9 @@ class _Card extends StatelessWidget {
   final bool noteOpen;
   final bool pickerOpen;
   final List<ProjectModel> projects;
-  final TextEditingController noteCtrl;
-  final ValueChanged<String> onNoteChanged;
+  final QuillController quillCtrl;
+  final FocusNode noteFocus;
+  final ScrollController noteScroll;
   final VoidCallback onToggleNote;
   final VoidCallback onTogglePicker;
   final ValueChanged<ProjectModel> onSelectProject;
@@ -201,8 +258,9 @@ class _Card extends StatelessWidget {
     required this.noteOpen,
     required this.pickerOpen,
     required this.projects,
-    required this.noteCtrl,
-    required this.onNoteChanged,
+    required this.quillCtrl,
+    required this.noteFocus,
+    required this.noteScroll,
     required this.onToggleNote,
     required this.onTogglePicker,
     required this.onSelectProject,
@@ -235,8 +293,9 @@ class _Card extends StatelessWidget {
             noteOpen: noteOpen,
             pickerOpen: pickerOpen,
             projects: projects,
-            noteCtrl: noteCtrl,
-            onNoteChanged: onNoteChanged,
+            quillCtrl: quillCtrl,
+            noteFocus: noteFocus,
+            noteScroll: noteScroll,
             onToggleNote: onToggleNote,
             onTogglePicker: onTogglePicker,
             onSelectProject: onSelectProject,
@@ -269,8 +328,9 @@ class _CardBox extends StatelessWidget {
   final bool noteOpen;
   final bool pickerOpen;
   final List<ProjectModel> projects;
-  final TextEditingController noteCtrl;
-  final ValueChanged<String> onNoteChanged;
+  final QuillController quillCtrl;
+  final FocusNode noteFocus;
+  final ScrollController noteScroll;
   final VoidCallback onToggleNote;
   final VoidCallback onTogglePicker;
   final ValueChanged<ProjectModel> onSelectProject;
@@ -287,8 +347,9 @@ class _CardBox extends StatelessWidget {
     required this.noteOpen,
     required this.pickerOpen,
     required this.projects,
-    required this.noteCtrl,
-    required this.onNoteChanged,
+    required this.quillCtrl,
+    required this.noteFocus,
+    required this.noteScroll,
     required this.onToggleNote,
     required this.onTogglePicker,
     required this.onSelectProject,
@@ -334,7 +395,7 @@ class _CardBox extends StatelessWidget {
           // Body + window controls overlay
           Stack(
             children: [
-              DragToMoveArea(
+              _DragArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(70, 10, 36, 11),
                   child: Column(
@@ -343,14 +404,14 @@ class _CardBox extends StatelessWidget {
                       // Project title
                       Text(
                         data.projectName ?? 'no session',
-                        style: spaceMono(size: 8, color: _kMuted),
+                        style: spaceMono(size: 10, color: _kMuted),
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       // Timer
                       RichText(
                         text: TextSpan(
-                          style: spaceMono(size: 19, weight: FontWeight.w800),
+                          style: spaceMono(size: 21, weight: FontWeight.w800),
                           children: [
                             TextSpan(text: parts[0], style: const TextStyle(color: _kInk)),
                             const TextSpan(text: ':', style: TextStyle(color: _kMuted, fontWeight: FontWeight.w500)),
@@ -365,12 +426,12 @@ class _CardBox extends StatelessWidget {
                       if (media.hasTrack)
                         _MarqueeText(
                           text: 'now playing · ${media.title}',
-                          style: spaceMono(size: 8.5, color: _kAccent),
+                          style: spaceMono(size: 10, color: _kAccent),
                         )
                       else
                         Text(
                           'not playing',
-                          style: spaceMono(size: 8.5, color: _kMuted),
+                          style: spaceMono(size: 10, color: _kMuted),
                         ),
                       const SizedBox(height: 6),
                       // Transport row
@@ -422,8 +483,11 @@ class _CardBox extends StatelessWidget {
               ),
             ],
           ),
-          // Note panel
-          if (noteOpen) _NotePanel(controller: noteCtrl, onChanged: onNoteChanged),
+          if (noteOpen) NotePanelWidget(
+            controller: quillCtrl,
+            focusNode: noteFocus,
+            scrollController: noteScroll,
+          ),
           // Project picker panel
           if (pickerOpen) _ProjectPicker(
             projects: projects,
@@ -463,7 +527,7 @@ class _Pill extends StatelessWidget {
         Positioned(
           left: pillLeft,
           top: pillTop,
-          child: DragToMoveArea(
+          child: _DragArea(
             child: Container(
               height: 38,
               padding: const EdgeInsets.fromLTRB(36, 8, 10, 8),
@@ -509,58 +573,6 @@ class _Pill extends StatelessWidget {
             isSpinning: media.isPlaying,
             albumArtBytes: media.albumArtBytes,
             size: _kVinylPill,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Note panel ───────────────────────────────────────────────────────────────
-
-class _NotePanel extends StatelessWidget {
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  const _NotePanel({required this.controller, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(height: 1, color: _kLine),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 5, 8, 3),
-          child: Row(
-            children: [
-              RichText(
-                text: TextSpan(
-                  style: spaceMono(size: 9.5, color: _kMuted),
-                  children: const [
-                    TextSpan(text: 'note'),
-                    TextSpan(text: '_', style: TextStyle(color: _kInk, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 60, maxHeight: 150),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 1, 12, 11),
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              maxLines: null,
-              style: dmSans(size: 11, color: const Color(0xFF24272D)),
-              decoration: InputDecoration.collapsed(
-                hintText: 'what are you working on...',
-                hintStyle: dmSans(size: 11, color: const Color(0xFFBCC0C8)),
-              ),
-            ),
           ),
         ),
       ],
@@ -794,6 +806,22 @@ class _WinBtnState extends State<_WinBtn> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Drag area (no double-tap maximize) ───────────────────────────────────────
+
+class _DragArea extends StatelessWidget {
+  final Widget child;
+  const _DragArea({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (_) => windowManager.startDragging(),
+      child: child,
     );
   }
 }

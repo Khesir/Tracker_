@@ -104,6 +104,8 @@ class TimerController {
     uiState.emit(const TimerUiData(status: TimerStatus.idle));
   }
 
+  String? get currentNoteJson => _activeSession?.noteJson;
+
   void updateNote(String noteJson) {
     if (_activeSession == null) return;
     _activeSession = _activeSession!.copyWith(noteJson: noteJson);

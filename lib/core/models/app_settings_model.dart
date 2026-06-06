@@ -9,6 +9,8 @@ class AppSettingsModel {
   final bool alwaysOnTop;
   final bool roundToNearest;
   final bool anchorVinyl;
+  final bool miniOpacityEnabled;
+  final double miniIdleOpacity;
 
   const AppSettingsModel({
     this.themeKey = 'dark',
@@ -21,6 +23,8 @@ class AppSettingsModel {
     this.alwaysOnTop = true,
     this.roundToNearest = false,
     this.anchorVinyl = true,
+    this.miniOpacityEnabled = false,
+    this.miniIdleOpacity = 0.3,
   });
 
   Map<String, dynamic> toJson() => {
@@ -34,6 +38,8 @@ class AppSettingsModel {
         'alwaysOnTop': alwaysOnTop,
         'roundToNearest': roundToNearest,
         'anchorVinyl': anchorVinyl,
+        'miniOpacityEnabled': miniOpacityEnabled,
+        'miniIdleOpacity': miniIdleOpacity,
       };
 
   factory AppSettingsModel.fromJson(Map<String, dynamic> json) => AppSettingsModel(
@@ -47,6 +53,8 @@ class AppSettingsModel {
         alwaysOnTop: json['alwaysOnTop'] as bool? ?? true,
         roundToNearest: json['roundToNearest'] as bool? ?? false,
         anchorVinyl: json['anchorVinyl'] as bool? ?? true,
+        miniOpacityEnabled: json['miniOpacityEnabled'] as bool? ?? false,
+        miniIdleOpacity: (json['miniIdleOpacity'] as num?)?.toDouble() ?? 0.3,
       );
 
   AppSettingsModel copyWith({
@@ -60,6 +68,8 @@ class AppSettingsModel {
     bool? alwaysOnTop,
     bool? roundToNearest,
     bool? anchorVinyl,
+    bool? miniOpacityEnabled,
+    double? miniIdleOpacity,
   }) {
     return AppSettingsModel(
       themeKey: themeKey ?? this.themeKey,
@@ -72,6 +82,8 @@ class AppSettingsModel {
       alwaysOnTop: alwaysOnTop ?? this.alwaysOnTop,
       roundToNearest: roundToNearest ?? this.roundToNearest,
       anchorVinyl: anchorVinyl ?? this.anchorVinyl,
+      miniOpacityEnabled: miniOpacityEnabled ?? this.miniOpacityEnabled,
+      miniIdleOpacity: miniIdleOpacity ?? this.miniIdleOpacity,
     );
   }
 }

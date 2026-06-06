@@ -75,6 +75,14 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
     await _ctrl.update(current.copyWith(anchorVinyl: v));
   }
 
+  Future<void> _setMiniOpacityEnabled(bool v, AppSettingsModel current) async {
+    await _ctrl.update(current.copyWith(miniOpacityEnabled: v));
+  }
+
+  Future<void> _setMiniIdleOpacity(double v, AppSettingsModel current) async {
+    await _ctrl.update(current.copyWith(miniIdleOpacity: v));
+  }
+
   Future<void> _exportCsv(BuildContext context, bool isDark, Color textMuted) async {
     final projectsState = _projects.uiState.state;
     final projects = projectsState is AsyncData<List<ProjectModel>>
@@ -283,7 +291,7 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
                     ),
                     _SetRow(
                       isDark: isDark,
-                      isLast: true,
+                      isLast: false,
                       label: 'anchor_vinyl',
                       description: 'let the record overhang the widget edge',
                       right: Switch(
@@ -298,6 +306,61 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
                         onChanged: (v) => _setAnchorVinyl(v, settings),
                       ),
                     ),
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: !settings.miniOpacityEnabled,
+                      label: 'fade_on_idle',
+                      description: 'dim the widget when mouse leaves it',
+                      right: Switch(
+                        value: settings.miniOpacityEnabled,
+                        activeTrackColor: isDark
+                            ? AppStyling.accentPrimaryDark
+                            : AppStyling.accentLight,
+                        activeThumbColor: Colors.white,
+                        inactiveTrackColor: isDark
+                            ? AppStyling.borderDark
+                            : AppStyling.borderLightStrong,
+                        onChanged: (v) => _setMiniOpacityEnabled(v, settings),
+                      ),
+                    ),
+                    if (settings.miniOpacityEnabled)
+                      _SetRow(
+                        isDark: isDark,
+                        isLast: true,
+                        label: 'idle_opacity',
+                        description: null,
+                        right: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${(settings.miniIdleOpacity * 100).round()}%',
+                              style: spaceMono(
+                                size: 12,
+                                weight: FontWeight.w700,
+                                color: isDark
+                                    ? AppStyling.textPrimaryDark
+                                    : AppStyling.textPrimaryLight,
+                              ),
+                            ),
+                            SizedBox(
+                              width: 160,
+                              child: Slider(
+                                value: settings.miniIdleOpacity,
+                                min: 0.05,
+                                max: 0.95,
+                                divisions: 18,
+                                activeColor: isDark
+                                    ? AppStyling.accentPrimaryDark
+                                    : AppStyling.accentLight,
+                                inactiveColor: isDark
+                                    ? AppStyling.borderDark
+                                    : AppStyling.borderLight,
+                                onChanged: (v) => _setMiniIdleOpacity(v, settings),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
