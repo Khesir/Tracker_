@@ -1,7 +1,7 @@
 name: time_track
 description: "trackr_ — intentional time tracking with session notes and music context."
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.1.2+20
 
 environment:
   sdk: ^3.9.2
