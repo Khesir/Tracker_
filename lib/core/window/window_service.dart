@@ -33,6 +33,15 @@ class WindowService {
     });
   }
 
+  Future<void> focusExisting() async {
+    if (kIsWeb) return;
+    if (await windowManager.isMinimized()) {
+      await windowManager.restore();
+    }
+    await windowManager.show();
+    await windowManager.focus();
+  }
+
   Future<void> enterMiniMode() async {
     if (isMiniMode) return;
     // Switch widget tree to TimerScreen before resizing so the full app shell
