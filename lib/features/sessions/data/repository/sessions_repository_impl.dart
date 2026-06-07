@@ -7,18 +7,26 @@ class SessionsRepositoryImpl implements SessionsRepository {
   SessionsRepositoryImpl(this._datasource);
 
   @override
-  Future<List<SessionModel>> getAll() => _datasource.getAll();
+  Future<List<SessionModel>> getAll() async {
+    final all = await _datasource.getAll();
+    return all.where((s) => !s.isDeleted).toList();
+  }
 
   @override
   Future<List<SessionModel>> getByProject(String projectId) async {
     final all = await _datasource.getAll();
-    return all.where((s) => s.projectId == projectId).toList();
+    return all.where((s) => s.projectId == projectId && !s.isDeleted).toList();
   }
 
   @override
   Future<List<SessionModel>> getByDateRange(DateTime from, DateTime to) async {
     final all = await _datasource.getAll();
-    return all.where((s) => s.startedAt.isAfter(from) && s.startedAt.isBefore(to)).toList();
+    return all
+        .where((s) =>
+            !s.isDeleted &&
+            s.startedAt.isAfter(from) &&
+            s.startedAt.isBefore(to))
+        .toList();
   }
 
   @override
@@ -29,4 +37,36 @@ class SessionsRepositoryImpl implements SessionsRepository {
 
   @override
   Future<void> delete(String id) => _datasource.delete(id);
+
+  @override
+  Future<void> softDeleteByProject(String projectId) async {
+    final sessions = await _datasource.getByProject(projectId);
+    final now = DateTime.now();
+    for (final session in sessions) {
+      await _datasource.save(session.copyWith(deletedAt: now));
+    }
+  }
+
+  @override
+  Future<void> restoreByProject(String projectId) async {
+    final sessions = await _datasource.getByProject(projectId);
+    for (final session in sessions) {
+      await _datasource.save(SessionModel(
+        id: session.id,
+        projectId: session.projectId,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+        durationSeconds: session.durationSeconds,
+        noteJson: session.noteJson,
+        musicLog: session.musicLog,
+        deletedAt: null,
+      ));
+    }
+  }
+
+  @override
+  Future<void> purgeByProject(String projectId) async {
+    final sessions = await _datasource.getByProject(projectId);
+    await _datasource.deleteAll(sessions.map((s) => s.id));
+  }
 }

@@ -8,7 +8,15 @@
       "PowerShell(New-Item *)",
       "Bash(flutter clean *)",
       "Bash(git stash *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(grep -n \"_Section\\\\|_SettingsSection\\\\|Text\\('//\\\\|section\\\\|Section\\(\" ./lib/features/settings/presentation/screen/settings_screen.dart)",
+      "Bash(mv ready/001-project-model-soft-delete-rename.md in-progress/)",
+      "Bash(mv ready/002-session-model-soft-delete-field.md in-progress/)",
+      "Bash(mv ready/009-app-settings-project-drawer-style.md in-progress/)",
+      "Bash(mv ready/008-project-form-daily-target-copy.md in-progress/)",
+      "Bash(flutter --version)",
+      "Bash(git mv *)",
+      "Bash(flutter test *)"
     ]
   }
 }

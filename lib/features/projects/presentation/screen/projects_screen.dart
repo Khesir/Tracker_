@@ -8,10 +8,12 @@ import '../../../../core/theme/app_styling.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/scoped_screen.dart';
 import '../../../sessions/domain/controller/sessions_controller.dart';
+import '../../../settings/domain/controller/settings_controller.dart';
 import '../../../timer/domain/controller/timer_controller.dart';
 import '../../domain/controller/projects_controller.dart';
 import '../dialogs/project_form_dialog.dart';
 import '../widget/project_card_widget.dart';
+import '../widget/project_detail_drawer.dart';
 
 class ProjectsScreen extends ScopedScreen {
   const ProjectsScreen({super.key});
@@ -24,12 +26,14 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
   late final ProjectsController _controller;
   late final SessionsController _sessions;
   late final TimerController _timer;
+  late final SettingsController _settings;
 
   @override
   void registerServices() {
     _controller = locator.get<ProjectsController>();
     _sessions = locator.get<SessionsController>();
     _timer = locator.get<TimerController>();
+    _settings = locator.get<SettingsController>();
   }
 
   @override
@@ -68,6 +72,17 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
     final now = DateTime.now();
     return sessions
         .where((s) =>
+            s.startedAt.year == now.year &&
+            s.startedAt.month == now.month &&
+            s.startedAt.day == now.day)
+        .fold(0, (acc, s) => acc + s.durationSeconds);
+  }
+
+  int _todaySecondsForProject(String projectId, List<SessionModel> sessions) {
+    final now = DateTime.now();
+    return sessions
+        .where((s) =>
+            s.projectId == projectId &&
             s.startedAt.year == now.year &&
             s.startedAt.month == now.month &&
             s.startedAt.day == now.day)
@@ -127,7 +142,7 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                 return AsyncStreamBuilder<List<ProjectModel>>(
                   state: _controller.uiState,
                   builder: (context, projects) {
-                    final active = projects.where((p) => !p.isArchived).toList();
+                    final active = projects.where((p) => !p.isDeleted).toList();
                     final top = projects.isNotEmpty
                         ? _topProject(sessions, projects)
                         : '—';
@@ -256,8 +271,19 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                                 return ProjectCardWidget(
                                   project: project,
                                   loggedSeconds: perProject[project.id] ?? 0,
+                                  todaySeconds:
+                                      _todaySecondsForProject(project.id, sessions),
                                   isActive: isActive,
-                                  onTap: () {},
+                                  onTap: () => ProjectDetailDrawer.show(
+                                    context,
+                                    project: project,
+                                    sessionsController: _sessions,
+                                    projectsController: _controller,
+                                    timerController: _timer,
+                                    isActive: isActive,
+                                    drawerStyle:
+                                        _settings.current?.projectDrawerStyle ?? 'side',
+                                  ),
                                   onStart: () => _startSession(project),
                                 );
                               },

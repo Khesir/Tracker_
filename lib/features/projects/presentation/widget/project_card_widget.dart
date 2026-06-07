@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 class ProjectCardWidget extends StatefulWidget {
   final ProjectModel project;
   final int loggedSeconds;
+  final int todaySeconds;
   final bool isActive;
   final VoidCallback onTap;
   final VoidCallback onStart;
@@ -14,6 +15,7 @@ class ProjectCardWidget extends StatefulWidget {
     super.key,
     required this.project,
     required this.loggedSeconds,
+    required this.todaySeconds,
     required this.isActive,
     required this.onTap,
     required this.onStart,
@@ -51,9 +53,8 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
 
     final targetSecs = (widget.project.targetMinutes ?? 0) * 60;
     final hasTarget = targetSecs > 0;
-    final progress = hasTarget
-        ? (widget.loggedSeconds / targetSecs).clamp(0.0, 1.0)
-        : 1.0;
+    final progress =
+        hasTarget ? (widget.todaySeconds / targetSecs).clamp(0.0, 1.0) : 0.0;
 
     final projectColor = _projectColor;
 
@@ -128,43 +129,40 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
                   ),
                 ),
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 12),
-                    child: Center(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Container(
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: progressBg,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: progress,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(4),
-                                gradient: hasTarget
-                                    ? LinearGradient(
+                  child: hasTarget
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 13, horizontal: 12),
+                          child: Center(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Container(
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: progressBg,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: FractionallySizedBox(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: progress,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(4),
+                                      gradient: LinearGradient(
                                         colors: [
-                                          Color.lerp(projectColor, Colors.white, 0.4)!,
+                                          Color.lerp(
+                                              projectColor, Colors.white, 0.4)!,
                                           projectColor,
                                         ],
-                                      )
-                                    : LinearGradient(
-                                        colors: [
-                                          projectColor.withValues(alpha: 0.3),
-                                          projectColor.withValues(alpha: 0.3),
-                                        ],
                                       ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-                  ),
+                        )
+                      : const SizedBox.shrink(),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(0, 13, 17, 13),

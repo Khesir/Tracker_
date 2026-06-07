@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 /// Prevents multiple app instances from opening the same Hive cache
 /// concurrently (which crashes with a PathAccessException lock error).
 ///
@@ -7,7 +9,7 @@ import 'dart:io';
 /// port and acts as the lock holder; later instances fail to bind, ping
 /// the holder to bring its window to front, then exit.
 class SingleInstanceService {
-  static const _lockPort = 51823;
+  static const _lockPort = kDebugMode ? 51824 : 51823;
 
   ServerSocket? _server;
   void Function()? onSecondInstanceLaunched;

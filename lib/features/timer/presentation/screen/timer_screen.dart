@@ -82,7 +82,7 @@ class _TimerScreenState extends State<TimerScreen> {
       if (!mounted) return;
       if (state is AsyncData<List<ProjectModel>>) {
         setState(() => _projectList =
-            state.data.where((p) => !p.isArchived).toList());
+            state.data.where((p) => !p.isDeleted).toList());
       }
     });
     _settingsSub = _settings.uiState.stream.listen((state) {

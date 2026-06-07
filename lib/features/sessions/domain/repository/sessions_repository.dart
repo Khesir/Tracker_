@@ -7,4 +7,7 @@ abstract class SessionsRepository {
   Future<SessionModel?> getById(String id);
   Future<void> save(SessionModel session);
   Future<void> delete(String id);
+  Future<void> softDeleteByProject(String projectId);
+  Future<void> restoreByProject(String projectId);
+  Future<void> purgeByProject(String projectId);
 }

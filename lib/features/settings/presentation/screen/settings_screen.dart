@@ -83,6 +83,10 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
     await _ctrl.update(current.copyWith(miniIdleOpacity: v));
   }
 
+  Future<void> _setProjectDrawerStyle(String style, AppSettingsModel current) async {
+    await _ctrl.update(current.copyWith(projectDrawerStyle: style));
+  }
+
   Future<void> _exportCsv(BuildContext context, bool isDark, Color textMuted) async {
     final projectsState = _projects.uiState.state;
     final projects = projectsState is AsyncData<List<ProjectModel>>
@@ -148,6 +152,28 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
                         selected: settings.themeKey == 'light',
                         isDark: isDark,
                         onTap: () => _setTheme('light', settings),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: _SetCard(
+                  isDark: isDark,
+                  rows: [
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: true,
+                      label: 'project_drawer_style',
+                      description: 'how project details open from the list',
+                      right: _ProjectDrawerStylePicker(
+                        isDark: isDark,
+                        value: settings.projectDrawerStyle,
+                        onChanged: (v) => _setProjectDrawerStyle(v, settings),
                       ),
                     ),
                   ],
@@ -402,7 +428,7 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
                     ),
                     _SetRow(
                       isDark: isDark,
-                      isLast: true,
+                      isLast: false,
                       label: 'storage',
                       description: 'everything stays on this device',
                       right: Text(
@@ -414,7 +440,25 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
                         ),
                       ),
                     ),
+                    _SetRow(
+                      isDark: isDark,
+                      isLast: true,
+                      label: 'projects_trash',
+                      description: 'restore or permanently delete removed projects',
+                      right: const SizedBox.shrink(),
+                    ),
                   ],
+                ),
+              ),
+            ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                child: _ProjectsTrashSection(
+                  isDark: isDark,
+                  textMuted: textMuted,
+                  projects: _projects,
                 ),
               ),
             ),
@@ -769,6 +813,61 @@ class _InactivityBehaviorPicker extends StatelessWidget {
   }
 }
 
+// ── Project Drawer Style Picker ───────────────────────────────────────────────
+
+class _ProjectDrawerStylePicker extends StatelessWidget {
+  final bool isDark;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _ProjectDrawerStylePicker({
+    required this.isDark,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const options = ['side', 'bottom'];
+    final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+    final border = isDark ? AppStyling.borderDark : AppStyling.borderLight;
+    final textMuted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: options.map((opt) {
+        final selected = value == opt;
+        final label = opt == 'side' ? 'side_panel' : 'bottom_sheet';
+        return GestureDetector(
+          onTap: () => onChanged(opt),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            margin: const EdgeInsets.only(left: 4),
+            decoration: BoxDecoration(
+              color: selected
+                  ? (isDark ? AppStyling.accentDimDark : AppStyling.accentDimLight)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: selected ? accent.withValues(alpha: 0.6) : border,
+              ),
+            ),
+            child: Text(
+              label,
+              style: spaceMono(
+                size: 10,
+                color: selected ? (isDark ? AppStyling.accentBadgeTextDark : accent) : textMuted,
+                weight: selected ? FontWeight.w700 : FontWeight.w400,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
 // ── Hotkey Picker ─────────────────────────────────────────────────────────────
 
 class _HotkeyPicker extends StatefulWidget {
@@ -956,6 +1055,201 @@ class _CaptureDialogState extends State<_CaptureDialog> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Projects Trash Section ────────────────────────────────────────────────────
+
+class _ProjectsTrashSection extends StatefulWidget {
+  final bool isDark;
+  final Color textMuted;
+  final ProjectsController projects;
+
+  const _ProjectsTrashSection({
+    required this.isDark,
+    required this.textMuted,
+    required this.projects,
+  });
+
+  @override
+  State<_ProjectsTrashSection> createState() => _ProjectsTrashSectionState();
+}
+
+class _ProjectsTrashSectionState extends State<_ProjectsTrashSection> {
+  List<ProjectModel>? _deleted;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final deleted = await widget.projects.getDeleted();
+    if (!mounted) return;
+    setState(() => _deleted = deleted);
+  }
+
+  Future<void> _restore(String id) async {
+    await widget.projects.restore(id);
+    await _refresh();
+  }
+
+  Future<void> _purge(String id) async {
+    final confirmed = await _confirmPurge(context);
+    if (!confirmed) return;
+    await widget.projects.purge(id);
+    await _refresh();
+  }
+
+  Future<bool> _confirmPurge(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: widget.isDark ? AppStyling.bgDark : AppStyling.bgLight,
+        title: Text(
+          'permanently_delete_project_',
+          style: spaceMono(
+            size: 13,
+            weight: FontWeight.w700,
+            color: widget.isDark
+                ? AppStyling.textPrimaryDark
+                : AppStyling.textPrimaryLight,
+          ),
+        ),
+        content: Text(
+          'this action cannot be undone.',
+          style: dmSans(size: AppStyling.bodySize, color: widget.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel', style: dmSans(size: 13, color: widget.textMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'delete',
+              style: dmSans(size: 13, color: const Color(0xFFEF4444)),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final deleted = _deleted;
+    if (deleted == null) {
+      return const SizedBox.shrink();
+    }
+
+    if (deleted.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Center(
+          child: Text(
+            'trash is empty',
+            style: spaceMono(size: 11, color: widget.textMuted),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: _SetCard(
+        isDark: widget.isDark,
+        rows: [
+          for (var i = 0; i < deleted.length; i++)
+            _TrashRow(
+              isDark: widget.isDark,
+              isLast: i == deleted.length - 1,
+              project: deleted[i],
+              textMuted: widget.textMuted,
+              onRestore: () => _restore(deleted[i].id),
+              onPurge: () => _purge(deleted[i].id),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrashRow extends StatelessWidget {
+  final bool isDark;
+  final bool isLast;
+  final ProjectModel project;
+  final Color textMuted;
+  final VoidCallback onRestore;
+  final VoidCallback onPurge;
+
+  const _TrashRow({
+    required this.isDark,
+    required this.isLast,
+    required this.project,
+    required this.textMuted,
+    required this.onRestore,
+    required this.onPurge,
+  });
+
+  Color get _projectColor =>
+      Color(int.parse(project.colorHex.replaceFirst('#', '0xFF')));
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = isDark ? AppStyling.borderDark : AppStyling.borderLight;
+    final textPrimary = isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight;
+    final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+      decoration: BoxDecoration(
+        border: isLast ? null : Border(bottom: BorderSide(color: borderColor)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _projectColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              project.name,
+              style: spaceMono(size: 12.5, weight: FontWeight.w700, color: textPrimary),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          GestureDetector(
+            onTap: onRestore,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Text(
+                'restore',
+                style: spaceMono(size: 10.5, color: accent, weight: FontWeight.w700),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onPurge,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Text(
+                'delete_forever',
+                style: spaceMono(size: 10.5, color: const Color(0xFFEF4444), weight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -8,6 +8,7 @@ class SessionModel {
   final int durationSeconds;
   final String noteJson;
   final List<MusicEntryModel> musicLog;
+  final DateTime? deletedAt;
 
   const SessionModel({
     required this.id,
@@ -17,9 +18,12 @@ class SessionModel {
     required this.durationSeconds,
     required this.noteJson,
     required this.musicLog,
+    this.deletedAt,
   });
 
   bool get isActive => endedAt == null;
+
+  bool get isDeleted => deletedAt != null;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -29,6 +33,7 @@ class SessionModel {
         'durationSeconds': durationSeconds,
         'noteJson': noteJson,
         'musicLog': musicLog.map((e) => e.toJson()).toList(),
+        'deletedAt': deletedAt?.toIso8601String(),
       };
 
   factory SessionModel.fromJson(Map<String, dynamic> json) => SessionModel(
@@ -41,6 +46,7 @@ class SessionModel {
         musicLog: (json['musicLog'] as List<dynamic>? ?? [])
             .map((e) => MusicEntryModel.fromJson(e as Map<String, dynamic>))
             .toList(),
+        deletedAt: json['deletedAt'] != null ? DateTime.parse(json['deletedAt'] as String) : null,
       );
 
   SessionModel copyWith({
@@ -48,6 +54,7 @@ class SessionModel {
     int? durationSeconds,
     String? noteJson,
     List<MusicEntryModel>? musicLog,
+    DateTime? deletedAt,
   }) {
     return SessionModel(
       id: id,
@@ -57,6 +64,7 @@ class SessionModel {
       durationSeconds: durationSeconds ?? this.durationSeconds,
       noteJson: noteJson ?? this.noteJson,
       musicLog: musicLog ?? this.musicLog,
+      deletedAt: deletedAt ?? this.deletedAt,
     );
   }
 }

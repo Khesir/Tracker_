@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'local_cache.dart';
 
@@ -15,7 +16,7 @@ class HiveLocalCache implements LocalCache {
   final Map<String, Box<Map>> _boxes = {};
 
   @override
-  Future<void> init() async => Hive.initFlutter();
+  Future<void> init() async => Hive.initFlutter(kDebugMode ? 'dev' : null);
 
   Future<Box<Map>> _box(String name) async =>
       _boxes[name] ??= await Hive.openBox<Map>(name);

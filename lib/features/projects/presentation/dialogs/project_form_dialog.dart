@@ -105,6 +105,11 @@ class _ProjectFormDialogState extends State<ProjectFormDialog> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 onSubmit: (_) => _submit(),
               ),
+              const SizedBox(height: 4),
+              Text(
+                'tracked per day, resets at midnight_',
+                style: dmSans(size: 10, color: textMuted),
+              ),
               const SizedBox(height: 16),
               _Label(text: 'color_', isDark: isDark),
               const SizedBox(height: 8),

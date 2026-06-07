@@ -2,6 +2,7 @@ class AppSettingsModel {
   final String themeKey;
   final int inactivityTimeoutSeconds;
   final String inactivityBehavior; // 'disabled', 'pause', 'stop'
+  final String projectDrawerStyle; // 'side', 'bottom'
   final bool floatLocked;
   final double floatOffsetX;
   final double floatOffsetY;
@@ -16,6 +17,7 @@ class AppSettingsModel {
     this.themeKey = 'dark',
     this.inactivityTimeoutSeconds = 300,
     this.inactivityBehavior = 'stop',
+    this.projectDrawerStyle = 'side',
     this.floatLocked = false,
     this.floatOffsetX = 40,
     this.floatOffsetY = 40,
@@ -31,6 +33,7 @@ class AppSettingsModel {
         'themeKey': themeKey,
         'inactivityTimeoutSeconds': inactivityTimeoutSeconds,
         'inactivityBehavior': inactivityBehavior,
+        'projectDrawerStyle': projectDrawerStyle,
         'floatLocked': floatLocked,
         'floatOffsetX': floatOffsetX,
         'floatOffsetY': floatOffsetY,
@@ -46,6 +49,7 @@ class AppSettingsModel {
         themeKey: json['themeKey'] as String? ?? 'dark',
         inactivityTimeoutSeconds: json['inactivityTimeoutSeconds'] as int? ?? 300,
         inactivityBehavior: json['inactivityBehavior'] as String? ?? 'stop',
+        projectDrawerStyle: json['projectDrawerStyle'] as String? ?? 'side',
         floatLocked: json['floatLocked'] as bool? ?? false,
         floatOffsetX: (json['floatOffsetX'] as num?)?.toDouble() ?? 40,
         floatOffsetY: (json['floatOffsetY'] as num?)?.toDouble() ?? 40,
@@ -61,6 +65,7 @@ class AppSettingsModel {
     String? themeKey,
     int? inactivityTimeoutSeconds,
     String? inactivityBehavior,
+    String? projectDrawerStyle,
     bool? floatLocked,
     double? floatOffsetX,
     double? floatOffsetY,
@@ -75,6 +80,7 @@ class AppSettingsModel {
       themeKey: themeKey ?? this.themeKey,
       inactivityTimeoutSeconds: inactivityTimeoutSeconds ?? this.inactivityTimeoutSeconds,
       inactivityBehavior: inactivityBehavior ?? this.inactivityBehavior,
+      projectDrawerStyle: projectDrawerStyle ?? this.projectDrawerStyle,
       floatLocked: floatLocked ?? this.floatLocked,
       floatOffsetX: floatOffsetX ?? this.floatOffsetX,
       floatOffsetY: floatOffsetY ?? this.floatOffsetY,

@@ -4,7 +4,7 @@ class ProjectModel {
   final String colorHex;
   final int? targetMinutes;
   final DateTime createdAt;
-  final DateTime? archivedAt;
+  final DateTime? deletedAt;
 
   const ProjectModel({
     required this.id,
@@ -12,10 +12,10 @@ class ProjectModel {
     required this.colorHex,
     this.targetMinutes,
     required this.createdAt,
-    this.archivedAt,
+    this.deletedAt,
   });
 
-  bool get isArchived => archivedAt != null;
+  bool get isDeleted => deletedAt != null;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -23,7 +23,7 @@ class ProjectModel {
         'colorHex': colorHex,
         'targetMinutes': targetMinutes,
         'createdAt': createdAt.toIso8601String(),
-        'archivedAt': archivedAt?.toIso8601String(),
+        'deletedAt': deletedAt?.toIso8601String(),
       };
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) => ProjectModel(
@@ -32,8 +32,8 @@ class ProjectModel {
         colorHex: json['colorHex'] as String,
         targetMinutes: json['targetMinutes'] as int?,
         createdAt: DateTime.parse(json['createdAt'] as String),
-        archivedAt: json['archivedAt'] != null
-            ? DateTime.parse(json['archivedAt'] as String)
+        deletedAt: json['deletedAt'] != null
+            ? DateTime.parse(json['deletedAt'] as String)
             : null,
       );
 
@@ -41,7 +41,7 @@ class ProjectModel {
     String? name,
     String? colorHex,
     int? targetMinutes,
-    DateTime? archivedAt,
+    DateTime? deletedAt,
   }) {
     return ProjectModel(
       id: id,
@@ -49,7 +49,7 @@ class ProjectModel {
       colorHex: colorHex ?? this.colorHex,
       targetMinutes: targetMinutes ?? this.targetMinutes,
       createdAt: createdAt,
-      archivedAt: archivedAt ?? this.archivedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
     );
   }
 }

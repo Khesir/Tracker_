@@ -5,5 +5,8 @@ abstract class ProjectsRepository {
   Future<ProjectModel?> getById(String id);
   Future<void> save(ProjectModel project);
   Future<void> delete(String id);
-  Future<void> archive(String id);
+  Future<void> softDelete(String id);
+  Future<void> restore(String id);
+  Future<void> purge(String id);
+  Future<List<ProjectModel>> getDeleted();
 }

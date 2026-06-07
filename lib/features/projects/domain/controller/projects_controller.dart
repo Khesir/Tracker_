@@ -3,12 +3,14 @@ import '../../../../core/state/stream_state.dart';
 import '../../../../core/models/project_model.dart';
 import '../../domain/repository/projects_repository.dart';
 import '../../presentation/state/projects_ui_state.dart';
+import '../../../timer/domain/controller/timer_controller.dart';
 
 class ProjectsController {
   final ProjectsRepository _repo;
+  final TimerController _timer;
   final ProjectsUiState uiState;
 
-  ProjectsController(this._repo) : uiState = ProjectsUiState();
+  ProjectsController(this._repo, this._timer) : uiState = ProjectsUiState();
 
   Future<void> load() => uiState.execute(() => _repo.getAll());
 
@@ -29,10 +31,25 @@ class ProjectsController {
     await load();
   }
 
-  Future<void> archive(String id) async {
-    await _repo.archive(id);
+  Future<void> softDelete(String id) async {
+    if (_timer.uiState.state.isRunning && _timer.uiState.state.projectId == id) {
+      await _timer.stop();
+    }
+    await _repo.softDelete(id);
     await load();
   }
+
+  Future<void> restore(String id) async {
+    await _repo.restore(id);
+    await load();
+  }
+
+  Future<void> purge(String id) async {
+    await _repo.purge(id);
+    await load();
+  }
+
+  Future<List<ProjectModel>> getDeleted() => _repo.getDeleted();
 
   Future<void> delete(String id) async {
     await _repo.delete(id);

@@ -22,4 +22,15 @@ class SessionsLocalDatasource {
       _cache.put(_box, session.id, session.toJson());
 
   Future<void> delete(String id) => _cache.delete(_box, id);
+
+  Future<List<SessionModel>> getByProject(String projectId) async {
+    final all = await getAll();
+    return all.where((s) => s.projectId == projectId).toList();
+  }
+
+  Future<void> deleteAll(Iterable<String> ids) async {
+    for (final id in ids) {
+      await _cache.delete(_box, id);
+    }
+  }
 }
