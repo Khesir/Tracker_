@@ -5,6 +5,8 @@ import 'data/repository/timer_repository_impl.dart';
 import 'domain/repository/timer_repository.dart';
 import 'domain/controller/timer_controller.dart';
 import '../sessions/domain/repository/sessions_repository.dart';
+import '../notes/domain/repository/notes_repository.dart';
+import '../projects/domain/repository/projects_repository.dart';
 
 void setupTimerDependencies() {
   locator.registerLazySingleton<TimerLocalDatasource>(
@@ -17,6 +19,8 @@ void setupTimerDependencies() {
     () => TimerController(
       locator.get<TimerRepository>(),
       locator.get<SessionsRepository>(),
+      locator.get<ProjectsRepository>(),
+      locator.get<NotesRepository>(),
     ),
   );
 }

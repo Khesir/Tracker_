@@ -9,6 +9,8 @@ class SessionModel {
   final String noteJson;
   final List<MusicEntryModel> musicLog;
   final DateTime? deletedAt;
+  final String? noteId;
+  final String? postNote;
 
   const SessionModel({
     required this.id,
@@ -19,6 +21,8 @@ class SessionModel {
     required this.noteJson,
     required this.musicLog,
     this.deletedAt,
+    this.noteId,
+    this.postNote,
   });
 
   bool get isActive => endedAt == null;
@@ -34,6 +38,8 @@ class SessionModel {
         'noteJson': noteJson,
         'musicLog': musicLog.map((e) => e.toJson()).toList(),
         'deletedAt': deletedAt?.toIso8601String(),
+        'noteId': noteId,
+        'postNote': postNote,
       };
 
   factory SessionModel.fromJson(Map<String, dynamic> json) => SessionModel(
@@ -47,6 +53,8 @@ class SessionModel {
             .map((e) => MusicEntryModel.fromJson(e as Map<String, dynamic>))
             .toList(),
         deletedAt: json['deletedAt'] != null ? DateTime.parse(json['deletedAt'] as String) : null,
+        noteId: json['noteId'] as String?,
+        postNote: json['postNote'] as String?,
       );
 
   SessionModel copyWith({
@@ -55,6 +63,8 @@ class SessionModel {
     String? noteJson,
     List<MusicEntryModel>? musicLog,
     DateTime? deletedAt,
+    String? noteId,
+    String? postNote,
   }) {
     return SessionModel(
       id: id,
@@ -65,6 +75,8 @@ class SessionModel {
       noteJson: noteJson ?? this.noteJson,
       musicLog: musicLog ?? this.musicLog,
       deletedAt: deletedAt ?? this.deletedAt,
+      noteId: noteId ?? this.noteId,
+      postNote: postNote ?? this.postNote,
     );
   }
 }

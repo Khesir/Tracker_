@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../core/models/session_model.dart';
 import '../../../../core/theme/app_styling.dart';
@@ -39,19 +38,21 @@ class _SessionRowWidgetState extends State<SessionRowWidget> {
     return '$h:$m';
   }
 
-  String _notePlainText(String noteJson) {
-    if (noteJson.isEmpty) return '';
-    try {
-      final delta = jsonDecode(noteJson) as List<dynamic>;
-      return delta
-          .where((op) => op is Map && op['insert'] is String)
-          .map((op) => op['insert'] as String)
-          .join()
-          .replaceAll('\n', ' ')
-          .trim();
-    } catch (_) {
-      return '';
+  // Legacy `session.noteJson` is dead going forward (issue 010/012) and is
+  // deliberately not surfaced here. This row previews `postNote` (plain
+  // text) when present, otherwise hints that a linked note exists via
+  // `noteId` without fetching it (avoids an async NoteModel lookup per row
+  // in what can be a long list — the full read-only preview of the live
+  // linked note lives in `SessionDetailSheet`, opened via [onTap]).
+  ({String text, bool isEmpty}) _preview(SessionModel session) {
+    final post = session.postNote?.trim();
+    if (post != null && post.isNotEmpty) {
+      return (text: post.replaceAll('\n', ' '), isEmpty: false);
     }
+    if (session.noteId != null) {
+      return (text: 'linked note', isEmpty: false);
+    }
+    return (text: 'no note', isEmpty: true);
   }
 
   ({String value, String unit}) _splitDuration(int seconds) {
@@ -73,7 +74,7 @@ class _SessionRowWidgetState extends State<SessionRowWidget> {
     final textFaint = isDark ? AppStyling.textFaintDark : AppStyling.textFaintLight;
 
     final projectColor = _projectColor();
-    final noteText = _notePlainText(widget.session.noteJson);
+    final notePreview = _preview(widget.session);
     final timeRange = widget.session.endedAt != null
         ? '${_formatTime(widget.session.startedAt)} → ${_formatTime(widget.session.endedAt!)}'
         : '${_formatTime(widget.session.startedAt)} → …';
@@ -142,14 +143,14 @@ class _SessionRowWidgetState extends State<SessionRowWidget> {
                     padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
                     child: Row(
                       children: [
-                        Icon(Icons.edit_rounded, size: 12, color: textFaint),
+                        Icon(Icons.sticky_note_2_outlined, size: 12, color: textFaint),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            noteText.isEmpty ? 'no note' : noteText,
+                            notePreview.text,
                             style: spaceMono(
                               size: 11,
-                              color: noteText.isEmpty ? textFaint : textMuted,
+                              color: notePreview.isEmpty ? textFaint : textMuted,
                             ),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,

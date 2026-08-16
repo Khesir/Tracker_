@@ -41,6 +41,9 @@ target_link_libraries(${BINARY_NAME} PRIVATE "windowsapp.lib")
 set_property(TARGET ${BINARY_NAME} PROPERTY CXX_STANDARD 17)
 target_compile_options(${BINARY_NAME} PRIVATE /await)
 target_compile_definitions(${BINARY_NAME} PRIVATE WINRT_LEAN_AND_MEAN)
+# Newer MSVC toolsets hard-error on the deprecated <experimental/coroutine>
+# headers that /await relies on unless explicitly silenced.
+target_compile_definitions(${BINARY_NAME} PRIVATE _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.

@@ -1,4 +1,5 @@
 import '../../../../core/models/project_model.dart';
+import '../../../notes/domain/repository/notes_repository.dart';
 import '../../../sessions/domain/repository/sessions_repository.dart';
 import '../../domain/repository/projects_repository.dart';
 import '../datasource/projects_local_datasource.dart';
@@ -6,7 +7,12 @@ import '../datasource/projects_local_datasource.dart';
 class ProjectsRepositoryImpl implements ProjectsRepository {
   final ProjectsLocalDatasource _datasource;
   final SessionsRepository _sessionsRepository;
-  ProjectsRepositoryImpl(this._datasource, this._sessionsRepository);
+  final NotesRepository _notesRepository;
+  ProjectsRepositoryImpl(
+    this._datasource,
+    this._sessionsRepository,
+    this._notesRepository,
+  );
 
   @override
   Future<List<ProjectModel>> getAll() async {
@@ -48,13 +54,31 @@ class ProjectsRepositoryImpl implements ProjectsRepository {
       targetMinutes: project.targetMinutes,
       createdAt: project.createdAt,
       deletedAt: null,
+      noteId: project.noteId,
     ));
     await _sessionsRepository.restoreByProject(id);
   }
 
   @override
   Future<void> purge(String id) async {
+    await unlinkNote(id);
     await _datasource.delete(id);
     await _sessionsRepository.purgeByProject(id);
+    await _notesRepository.unlinkFromProject(id);
+  }
+
+  @override
+  Future<void> unlinkNote(String projectId) async {
+    final project = await _datasource.getById(projectId);
+    if (project == null) return;
+    await _datasource.save(ProjectModel(
+      id: project.id,
+      name: project.name,
+      colorHex: project.colorHex,
+      targetMinutes: project.targetMinutes,
+      createdAt: project.createdAt,
+      deletedAt: project.deletedAt,
+      noteId: null,
+    ));
   }
 }

@@ -1,7 +1,7 @@
 ; Inno Setup script for trackr_
 
 #define MyAppName "trackr_"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.1.3"
 #define MyAppPublisher "Khesir"
 #define MyAppURL "https://keep-track.khesir.com/"
 #define MyAppExeName "time_track.exe"
@@ -20,7 +20,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 OutputDir=C:\Users\ajriz\Documents\Projects\keep-track\time-track\installers
-OutputBaseFilename=trackr-v0.1.0
+OutputBaseFilename=trackr-v0.1.3
 SetupIconFile=C:\Users\ajriz\Documents\Projects\keep-track\time-track\windows\runner\resources\app_icon.ico
 SolidCompression=yes
 WizardStyle=modern

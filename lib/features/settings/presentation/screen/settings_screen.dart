@@ -75,6 +75,10 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
     await _ctrl.update(current.copyWith(anchorVinyl: v));
   }
 
+  Future<void> _setWidgetStyle(String style, AppSettingsModel current) async {
+    await _ctrl.update(current.copyWith(widgetStyle: style));
+  }
+
   Future<void> _setMiniOpacityEnabled(bool v, AppSettingsModel current) async {
     await _ctrl.update(current.copyWith(miniOpacityEnabled: v));
   }
@@ -318,20 +322,32 @@ class _SettingsScreenState extends ScopedScreenState<SettingsScreen> {
                     _SetRow(
                       isDark: isDark,
                       isLast: false,
-                      label: 'anchor_vinyl',
-                      description: 'let the record overhang the widget edge',
-                      right: Switch(
-                        value: settings.anchorVinyl,
-                        activeTrackColor: isDark
-                            ? AppStyling.accentPrimaryDark
-                            : AppStyling.accentLight,
-                        activeThumbColor: Colors.white,
-                        inactiveTrackColor: isDark
-                            ? AppStyling.borderDark
-                            : AppStyling.borderLightStrong,
-                        onChanged: (v) => _setAnchorVinyl(v, settings),
+                      label: 'widget_style',
+                      description: 'how the mini widget looks',
+                      right: _WidgetStylePicker(
+                        isDark: isDark,
+                        value: settings.widgetStyle,
+                        onChanged: (v) => _setWidgetStyle(v, settings),
                       ),
                     ),
+                    if (settings.widgetStyle == 'vinyl')
+                      _SetRow(
+                        isDark: isDark,
+                        isLast: false,
+                        label: 'anchor_vinyl',
+                        description: 'let the record overhang the widget edge',
+                        right: Switch(
+                          value: settings.anchorVinyl,
+                          activeTrackColor: isDark
+                              ? AppStyling.accentPrimaryDark
+                              : AppStyling.accentLight,
+                          activeThumbColor: Colors.white,
+                          inactiveTrackColor: isDark
+                              ? AppStyling.borderDark
+                              : AppStyling.borderLightStrong,
+                          onChanged: (v) => _setAnchorVinyl(v, settings),
+                        ),
+                      ),
                     _SetRow(
                       isDark: isDark,
                       isLast: !settings.miniOpacityEnabled,
@@ -855,6 +871,60 @@ class _ProjectDrawerStylePicker extends StatelessWidget {
             ),
             child: Text(
               label,
+              style: spaceMono(
+                size: 10,
+                color: selected ? (isDark ? AppStyling.accentBadgeTextDark : accent) : textMuted,
+                weight: selected ? FontWeight.w700 : FontWeight.w400,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ── Widget Style Picker ───────────────────────────────────────────────────────
+
+class _WidgetStylePicker extends StatelessWidget {
+  final bool isDark;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _WidgetStylePicker({
+    required this.isDark,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const options = ['vinyl', 'bar'];
+    final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+    final border = isDark ? AppStyling.borderDark : AppStyling.borderLight;
+    final textMuted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: options.map((opt) {
+        final selected = value == opt;
+        return GestureDetector(
+          onTap: () => onChanged(opt),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            margin: const EdgeInsets.only(left: 4),
+            decoration: BoxDecoration(
+              color: selected
+                  ? (isDark ? AppStyling.accentDimDark : AppStyling.accentDimLight)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: selected ? accent.withValues(alpha: 0.6) : border,
+              ),
+            ),
+            child: Text(
+              '${opt}_',
               style: spaceMono(
                 size: 10,
                 color: selected ? (isDark ? AppStyling.accentBadgeTextDark : accent) : textMuted,

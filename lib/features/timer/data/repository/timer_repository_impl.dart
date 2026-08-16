@@ -17,4 +17,12 @@ class TimerRepositoryImpl implements TimerRepository {
   @override
   Future<void> clearActiveSession() =>
       _datasource.clearActiveSession();
+
+  @override
+  Future<void> setLastProjectId(String? projectId) =>
+      _datasource.setLastProjectId(projectId);
+
+  @override
+  Future<String?> getLastProjectId() =>
+      _datasource.getLastProjectId();
 }

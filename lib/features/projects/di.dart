@@ -1,5 +1,6 @@
 import '../../core/di/service_locator.dart';
 import '../../core/cache/local_cache.dart';
+import '../notes/domain/repository/notes_repository.dart';
 import '../sessions/domain/repository/sessions_repository.dart';
 import 'data/datasource/projects_local_datasource.dart';
 import 'data/repository/projects_repository_impl.dart';
@@ -15,6 +16,7 @@ void setupProjectsDependencies() {
     () => ProjectsRepositoryImpl(
       locator.get<ProjectsLocalDatasource>(),
       locator.get<SessionsRepository>(),
+      locator.get<NotesRepository>(),
     ),
   );
   locator.registerLazySingleton<ProjectsController>(

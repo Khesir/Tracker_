@@ -5,6 +5,7 @@ class ProjectModel {
   final int? targetMinutes;
   final DateTime createdAt;
   final DateTime? deletedAt;
+  final String? noteId;
 
   const ProjectModel({
     required this.id,
@@ -13,6 +14,7 @@ class ProjectModel {
     this.targetMinutes,
     required this.createdAt,
     this.deletedAt,
+    this.noteId,
   });
 
   bool get isDeleted => deletedAt != null;
@@ -24,6 +26,7 @@ class ProjectModel {
         'targetMinutes': targetMinutes,
         'createdAt': createdAt.toIso8601String(),
         'deletedAt': deletedAt?.toIso8601String(),
+        'noteId': noteId,
       };
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) => ProjectModel(
@@ -35,6 +38,7 @@ class ProjectModel {
         deletedAt: json['deletedAt'] != null
             ? DateTime.parse(json['deletedAt'] as String)
             : null,
+        noteId: json['noteId'] as String?,
       );
 
   ProjectModel copyWith({
@@ -42,6 +46,7 @@ class ProjectModel {
     String? colorHex,
     int? targetMinutes,
     DateTime? deletedAt,
+    String? noteId,
   }) {
     return ProjectModel(
       id: id,
@@ -50,6 +55,7 @@ class ProjectModel {
       targetMinutes: targetMinutes ?? this.targetMinutes,
       createdAt: createdAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      noteId: noteId ?? this.noteId,
     );
   }
 }

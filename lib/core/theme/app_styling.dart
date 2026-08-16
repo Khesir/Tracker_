@@ -56,6 +56,42 @@ class AppStyling {
   static const Size miniCardNoteSize = Size(296, 314);
   static const Size miniCardPickerSize = Size(296, 286);
   static const Size miniPillSize = Size(214, 72);
+  // Issue 011 — sub-states of the note toggle for a resolved project with
+  // no note linked yet (NoteResolution.noNoteLinked). The prompt
+  // (create-new/link-existing) is compact; the link-existing picker adds
+  // the same inline-list height budget as miniCardPickerSize's project
+  // list (140px, see ProjectPicker/NoteLinkPickerWidget).
+  static const Size miniCardNotePromptSize = Size(296, 226);
+  static const Size miniCardNoteLinkSize = Size(296, 296);
+
+  // ── bar_ card window sizes ──────────────────────────────────────
+  // Narrower than the vinyl card — no disc overhang means far less left
+  // margin is needed; card content itself is ~172px wide per the mockup.
+  // Sized to include ~28px right / ~48px bottom clearance for the card's
+  // BoxShadow (see bar_card_widget.dart) — the window's background is
+  // transparent, so any unused margin is simply invisible, not a visual
+  // defect; erring generous here is free.
+  static const Size miniBarCardSize = Size(252, 230);
+  static const Size miniBarCardNoteSize = Size(252, 395);
+  static const Size miniBarCardPickerSize = Size(252, 368);
+  // Issue 011 — mirrors miniCardNotePromptSize/miniCardNoteLinkSize above,
+  // just against the bar_ card's taller base size.
+  static const Size miniBarCardNotePromptSize = Size(252, 310);
+  static const Size miniBarCardNoteLinkSize = Size(252, 380);
+
+  // ── bar_ pill window sizes ────────────────────────────────────────
+  // Narrower than the bar_ card (150px content width per the mockup,
+  // vs. the card's 172px) but similar height — unlike the vinyl pill,
+  // the bar_ pill keeps the music line and project row, so it isn't
+  // drastically shorter than its card, only narrower. Same shadow
+  // clearance reasoning as the bar_ card sizes above.
+  static const Size miniBarPillSize = Size(230, 228);
+  // +picker: base height plus the inline project list's max height
+  // (140px, see ProjectPicker) — same delta pattern as
+  // miniBarCardPickerSize vs. miniBarCardSize. The bar_ pill has no
+  // existing "pill + picker" precedent (vinyl's pill has no picker at
+  // all today), so this is a new state introduced by this widget.
+  static const Size miniBarPillPickerSize = Size(230, 368);
 
   // kept for compatibility
   static const Size miniWindowSize = miniCardSize;

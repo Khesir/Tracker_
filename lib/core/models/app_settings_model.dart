@@ -12,6 +12,7 @@ class AppSettingsModel {
   final bool anchorVinyl;
   final bool miniOpacityEnabled;
   final double miniIdleOpacity;
+  final String widgetStyle; // 'vinyl', 'bar'
 
   const AppSettingsModel({
     this.themeKey = 'dark',
@@ -27,6 +28,7 @@ class AppSettingsModel {
     this.anchorVinyl = true,
     this.miniOpacityEnabled = false,
     this.miniIdleOpacity = 0.3,
+    this.widgetStyle = 'vinyl',
   });
 
   Map<String, dynamic> toJson() => {
@@ -43,6 +45,7 @@ class AppSettingsModel {
         'anchorVinyl': anchorVinyl,
         'miniOpacityEnabled': miniOpacityEnabled,
         'miniIdleOpacity': miniIdleOpacity,
+        'widgetStyle': widgetStyle,
       };
 
   factory AppSettingsModel.fromJson(Map<String, dynamic> json) => AppSettingsModel(
@@ -59,6 +62,7 @@ class AppSettingsModel {
         anchorVinyl: json['anchorVinyl'] as bool? ?? true,
         miniOpacityEnabled: json['miniOpacityEnabled'] as bool? ?? false,
         miniIdleOpacity: (json['miniIdleOpacity'] as num?)?.toDouble() ?? 0.3,
+        widgetStyle: json['widgetStyle'] as String? ?? 'vinyl',
       );
 
   AppSettingsModel copyWith({
@@ -75,6 +79,7 @@ class AppSettingsModel {
     bool? anchorVinyl,
     bool? miniOpacityEnabled,
     double? miniIdleOpacity,
+    String? widgetStyle,
   }) {
     return AppSettingsModel(
       themeKey: themeKey ?? this.themeKey,
@@ -90,6 +95,7 @@ class AppSettingsModel {
       anchorVinyl: anchorVinyl ?? this.anchorVinyl,
       miniOpacityEnabled: miniOpacityEnabled ?? this.miniOpacityEnabled,
       miniIdleOpacity: miniIdleOpacity ?? this.miniIdleOpacity,
+      widgetStyle: widgetStyle ?? this.widgetStyle,
     );
   }
 }

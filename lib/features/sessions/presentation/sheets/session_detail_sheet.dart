@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../core/models/music_entry_model.dart';
+import '../../../../core/models/note_model.dart';
 import '../../../../core/models/session_model.dart';
 import '../../../../core/theme/app_styling.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../widget/session_note_edit_dialog.dart';
+import '../../../notes/domain/repository/notes_repository.dart';
 
 class SessionDetailSheet extends StatelessWidget {
   final SessionModel session;
@@ -62,20 +66,6 @@ class SessionDetailSheet extends StatelessWidget {
     return '$wd, $d $mo — $h:$mi';
   }
 
-  String _noteToText(String noteJson) {
-    if (noteJson.isEmpty) return '';
-    try {
-      final delta = jsonDecode(noteJson) as List<dynamic>;
-      return delta
-          .where((op) => op is Map && op['insert'] is String)
-          .map((op) => op['insert'] as String)
-          .join()
-          .trim();
-    } catch (_) {
-      return '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -88,7 +78,6 @@ class SessionDetailSheet extends StatelessWidget {
     final accent =
         isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
 
-    final noteText = _noteToText(session.noteJson);
     final hasMusicLog = session.musicLog.isNotEmpty;
 
     return Container(
@@ -166,21 +155,31 @@ class SessionDetailSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // note section
-                  Text('// note', style: spaceMono(size: 10, color: textMuted)),
+                  // linked note section
+                  Text('// linked_note', style: spaceMono(size: 10, color: textMuted)),
                   const SizedBox(height: 10),
-                  if (noteText.isEmpty)
-                    Text(
-                      'no_note',
-                      style: dmSans(
-                          size: AppStyling.bodySize,
-                          color: textMuted.withValues(alpha: 0.5)),
-                    )
-                  else
-                    Text(
-                      noteText,
-                      style: dmSans(size: AppStyling.bodySize, color: textPrimary),
-                    ),
+                  _LinkedNoteSection(
+                    noteId: session.noteId,
+                    isDark: isDark,
+                    border: border,
+                    textPrimary: textPrimary,
+                    textMuted: textMuted,
+                    accent: accent,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // post-note section
+                  Text('// post_note', style: spaceMono(size: 10, color: textMuted)),
+                  const SizedBox(height: 10),
+                  _PostNoteField(
+                    session: session,
+                    onSave: onSave,
+                    isDark: isDark,
+                    border: border,
+                    textPrimary: textPrimary,
+                    textMuted: textMuted,
+                  ),
 
                   // music section
                   if (hasMusicLog) ...[
@@ -209,21 +208,6 @@ class SessionDetailSheet extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Expanded(
-                  child: _ActionButton(
-                    label: 'edit_note_',
-                    isDark: isDark,
-                    onTap: () async {
-                      final updated =
-                          await SessionNoteEditDialog.show(context, session);
-                      if (updated != null) {
-                        await onSave(updated);
-                        if (context.mounted) Navigator.pop(context);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
                 Expanded(
                   child: _ActionButton(
                     label: 'delete_',
@@ -362,6 +346,235 @@ class _ActionButtonState extends State<_ActionButton> {
             widget.label,
             style: spaceMono(size: 11, color: color),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Read-only reference to the note linked to this session at start time
+/// (via [SessionModel.noteId]). Fetches the [NoteModel] live by id on
+/// build/id-change rather than trusting any frozen copy, so if the note is
+/// edited elsewhere (Notes screen, project drawer, mini widget) this
+/// reflects that. Editing does not happen here by design (per PRD) — tapping
+/// only surfaces a hint to go edit it in the Notes screen. There is no
+/// screen-index-aware navigation plumbing reachable from this deep in the
+/// sessions feature without a larger shell refactor (see `lib/app.dart`
+/// `_FullAppShellState`, which keeps `_selectedIndex` as private local
+/// state), so a `SnackBar` hint is used as the deliberately simple fallback.
+class _LinkedNoteSection extends StatefulWidget {
+  final String? noteId;
+  final bool isDark;
+  final Color border;
+  final Color textPrimary;
+  final Color textMuted;
+  final Color accent;
+
+  const _LinkedNoteSection({
+    required this.noteId,
+    required this.isDark,
+    required this.border,
+    required this.textPrimary,
+    required this.textMuted,
+    required this.accent,
+  });
+
+  @override
+  State<_LinkedNoteSection> createState() => _LinkedNoteSectionState();
+}
+
+class _LinkedNoteSectionState extends State<_LinkedNoteSection> {
+  bool _loading = true;
+  NoteModel? _note;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LinkedNoteSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.noteId != widget.noteId) _load();
+  }
+
+  Future<void> _load() async {
+    final id = widget.noteId;
+    if (id == null) {
+      setState(() {
+        _note = null;
+        _loading = false;
+      });
+      return;
+    }
+    setState(() => _loading = true);
+    final note = await locator.get<NotesRepository>().getById(id);
+    if (!mounted) return;
+    setState(() {
+      _note = note;
+      _loading = false;
+    });
+  }
+
+  String _preview(NoteModel note) {
+    if (note.noteJson.isEmpty) return '';
+    try {
+      final delta = jsonDecode(note.noteJson) as List;
+      return Document.fromJson(delta).toPlainText().trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  void _hintOpenNotesScreen(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: widget.isDark ? AppStyling.surfaceDark : AppStyling.surfaceLight,
+        content: Text(
+          'open the notes screen to view or edit this note',
+          style: dmSans(size: 12, color: widget.textMuted),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 4),
+        child: SizedBox(
+          height: 14,
+          width: 14,
+          child: CircularProgressIndicator(strokeWidth: 1.5),
+        ),
+      );
+    }
+
+    if (widget.noteId == null || _note == null) {
+      return Text(
+        'no_linked_note',
+        style: dmSans(
+            size: AppStyling.bodySize,
+            color: widget.textMuted.withValues(alpha: 0.5)),
+      );
+    }
+
+    final preview = _preview(_note!);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => _hintOpenNotesScreen(context),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: widget.border),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.sticky_note_2_outlined, size: 13, color: widget.accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  preview.isEmpty ? '(empty note)' : preview,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: dmSans(size: AppStyling.bodySize, color: widget.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Optional, plain-text, directly-editable field for `SessionModel.postNote`.
+/// Unlike the linked note above, this is private to the session and has no
+/// rich-text formatting — a deliberate contrast per the PRD. Saves are
+/// debounced (matching the 500ms debounce the old per-session rich-text
+/// editor used) and go through the same `onSave` callback the rest of this
+/// sheet already uses, which routes to `SessionsController.update()` ->
+/// `SessionsRepository.save()`. Leaving it blank is valid; no validation.
+class _PostNoteField extends StatefulWidget {
+  final SessionModel session;
+  final Future<void> Function(SessionModel updated) onSave;
+  final bool isDark;
+  final Color border;
+  final Color textPrimary;
+  final Color textMuted;
+
+  const _PostNoteField({
+    required this.session,
+    required this.onSave,
+    required this.isDark,
+    required this.border,
+    required this.textPrimary,
+    required this.textMuted,
+  });
+
+  @override
+  State<_PostNoteField> createState() => _PostNoteFieldState();
+}
+
+class _PostNoteFieldState extends State<_PostNoteField> {
+  late final TextEditingController _controller;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.session.postNote ?? '');
+  }
+
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      widget.onSave(widget.session.copyWith(postNote: value));
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      onChanged: _onChanged,
+      minLines: 2,
+      maxLines: 4,
+      style: dmSans(size: AppStyling.bodySize, color: widget.textPrimary),
+      cursorColor: widget.textPrimary,
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: 'optional note, added after the session...',
+        hintStyle: dmSans(
+            size: AppStyling.bodySize,
+            color: widget.textMuted.withValues(alpha: 0.5)),
+        contentPadding: const EdgeInsets.all(10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: widget.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: widget.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: widget.textMuted),
         ),
       ),
     );

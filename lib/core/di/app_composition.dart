@@ -9,6 +9,9 @@ import '../media/media_service.dart';
 import '../media/windows_media_service.dart';
 import '../window/window_service.dart';
 import '../../features/sessions/api.dart';
+import '../../features/notes/di.dart';
+import '../../features/notes/data/note_migration.dart';
+import '../../features/notes/domain/repository/notes_repository.dart';
 import '../../features/projects/api.dart';
 import '../../features/timer/api.dart';
 import '../../features/analytics/api.dart';
@@ -33,10 +36,17 @@ Future<void> initializeApp() async {
   locator.registerSingleton<MediaService>(mediaService);
 
   setupSessionsDependencies();
+  setupNotesDependencies();
   setupProjectsDependencies();
   setupTimerDependencies();
   setupAnalyticsDependencies();
   setupSettingsDependencies();
+
+  await runLegacyNoteMigration(
+    projects: locator.get<ProjectsRepository>(),
+    sessions: locator.get<SessionsRepository>(),
+    notes: locator.get<NotesRepository>(),
+  );
 
   locator.registerSingleton<HotkeyService>(HotkeyService());
 }

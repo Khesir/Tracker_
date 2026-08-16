@@ -46,6 +46,11 @@ class FakeProjectsRepository implements ProjectsRepository {
 
   @override
   Future<List<ProjectModel>> getDeleted() async => deleted;
+
+  @override
+  Future<void> unlinkNote(String projectId) async {
+    calls.add('unlinkNote:$projectId');
+  }
 }
 
 class FakeTimerController implements TimerController {

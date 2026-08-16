@@ -8,6 +8,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/app_styling.dart';
 import 'core/ui/desktop_title_bar.dart';
 import 'core/window/window_service.dart';
+import 'features/notes/presentation/screen/notes_screen.dart';
 import 'features/projects/presentation/screen/projects_screen.dart';
 import 'features/sessions/presentation/screen/sessions_screen.dart';
 import 'features/analytics/presentation/screen/analytics_screen.dart';
@@ -106,6 +107,7 @@ class _FullAppShellState extends State<_FullAppShell> {
 
   static const _screens = [
     ProjectsScreen(),
+    NotesScreen(),
     SessionsScreen(),
     AnalyticsScreen(),
     SettingsScreen(),
@@ -113,6 +115,7 @@ class _FullAppShellState extends State<_FullAppShell> {
 
   static const _navItems = [
     _NavItem(label: 'projects_', icon: Icons.folder_outlined),
+    _NavItem(label: 'notes_', icon: Icons.sticky_note_2_outlined),
     _NavItem(label: 'sessions_', icon: Icons.access_time_rounded),
     _NavItem(label: 'analytics_', icon: Icons.bar_chart_rounded),
     _NavItem(label: 'settings_', icon: Icons.settings_outlined),

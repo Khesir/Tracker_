@@ -7,6 +7,7 @@ import '../../../../core/state/stream_state.dart';
 import '../../../../core/theme/app_styling.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/scoped_screen.dart';
+import '../../../notes/domain/repository/notes_repository.dart';
 import '../../../sessions/domain/controller/sessions_controller.dart';
 import '../../../settings/domain/controller/settings_controller.dart';
 import '../../../timer/domain/controller/timer_controller.dart';
@@ -57,6 +58,11 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
 
   Future<void> _startSession(ProjectModel project) async {
     await _timer.start(projectId: project.id, projectName: project.name);
+    _controller.load();
+  }
+
+  Future<void> _stopSession() async {
+    await _timer.stop();
     _controller.load();
   }
 
@@ -280,11 +286,13 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                                     sessionsController: _sessions,
                                     projectsController: _controller,
                                     timerController: _timer,
+                                    notesRepository: locator.get<NotesRepository>(),
                                     isActive: isActive,
                                     drawerStyle:
                                         _settings.current?.projectDrawerStyle ?? 'side',
                                   ),
                                   onStart: () => _startSession(project),
+                                  onStop: () => _stopSession(),
                                 );
                               },
                             ),

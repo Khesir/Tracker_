@@ -10,6 +10,7 @@ class ProjectCardWidget extends StatefulWidget {
   final bool isActive;
   final VoidCallback onTap;
   final VoidCallback onStart;
+  final VoidCallback onStop;
 
   const ProjectCardWidget({
     super.key,
@@ -19,6 +20,7 @@ class ProjectCardWidget extends StatefulWidget {
     required this.isActive,
     required this.onTap,
     required this.onStart,
+    required this.onStop,
   });
 
   @override
@@ -122,7 +124,6 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
                         Text(
                           _statusLine(),
                           style: spaceMono(size: 10.5, color: textMuted),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -205,17 +206,24 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
                         ),
                         const SizedBox(width: 10),
                         if (widget.isActive)
-                          Container(
-                            width: 26,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              color: projectColor.withValues(alpha: 0.15),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.stop_rounded,
-                              size: 14,
-                              color: projectColor,
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: widget.onStop,
+                              child: Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  color: projectColor.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.stop_rounded,
+                                  size: 14,
+                                  color: projectColor,
+                                ),
+                              ),
                             ),
                           )
                         else

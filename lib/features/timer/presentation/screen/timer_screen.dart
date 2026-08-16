@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_quill/quill_delta.dart';
+import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/media/media_info.dart';
 import '../../../../core/media/media_service.dart';
 import '../../../../core/models/app_settings_model.dart';
+import '../../../../core/models/note_model.dart';
 import '../../../../core/models/project_model.dart';
 import '../../../../core/state/stream_builder_widget.dart';
 import '../../../../core/state/stream_state.dart';
@@ -16,9 +18,15 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/window/window_service.dart';
 import '../../domain/controller/timer_controller.dart';
 import '../state/timer_ui_state.dart';
-import '../widget/note_panel_widget.dart';
+import '../widget/marquee_text_widget.dart';
+import '../widget/note_link_prompt_widget.dart';
+import '../widget/project_picker_widget.dart';
 import '../widget/record_disk_widget.dart';
+import '../widget/bar_card_widget.dart';
+import '../widget/bar_pill_widget.dart';
+import '../../../notes/domain/repository/notes_repository.dart';
 import '../../../projects/domain/controller/projects_controller.dart';
+import '../../../projects/domain/repository/projects_repository.dart';
 import '../../../settings/domain/controller/settings_controller.dart';
 
 // Design tokens — this widget is always light (white card over desktop)
@@ -45,6 +53,8 @@ class _TimerScreenState extends State<TimerScreen> {
   late final ProjectsController _projects;
   late final MediaService _media;
   late final SettingsController _settings;
+  late final NotesRepository _notesRepo;
+  late final ProjectsRepository _projectsRepo;
   late final StreamSubscription<MediaInfo> _mediaSub;
   late final StreamSubscription<dynamic> _projectsSub;
   late final StreamSubscription<dynamic> _settingsSub;
@@ -56,9 +66,20 @@ class _TimerScreenState extends State<TimerScreen> {
   bool _noteOpen = false;
   bool _pickerOpen = false;
   bool _hovered = false;
-  late final QuillController _quillCtrl;
+  QuillController _quillCtrl = QuillController.basic();
   final _noteFocus = FocusNode();
   final _noteScroll = ScrollController();
+
+  // Issue 011 — the note toggle now resolves a three-way note state
+  // (TimerController.resolveNoteState) rather than always opening the
+  // editor: _noteView tracks which sub-panel is showing (editor / the
+  // create-or-link prompt / the link-existing picker), _noteProjectId
+  // pins the create/link actions to whichever project resolved, and
+  // _unlinkedNotes/_noteBusy back the picker sub-view.
+  NotePanelView _noteView = NotePanelView.editor;
+  String? _noteProjectId;
+  List<NoteModel> _unlinkedNotes = [];
+  bool _noteBusy = false;
 
   @override
   void initState() {
@@ -67,8 +88,10 @@ class _TimerScreenState extends State<TimerScreen> {
     _projects = locator.get<ProjectsController>();
     _media = locator.get<MediaService>();
     _settings = locator.get<SettingsController>();
-    _quillCtrl = _buildQuillController(_controller.currentNoteJson);
+    _notesRepo = locator.get<NotesRepository>();
+    _projectsRepo = locator.get<ProjectsRepository>();
     _quillCtrl.addListener(_onNoteChanged);
+    _loadInitialNote();
     _currentMedia = _media.current;
     _mediaSub = _media.stream.listen((info) {
       debugPrint('[TimerScreen] stream event: title=${info.title} playing=${info.isPlaying}');
@@ -89,10 +112,41 @@ class _TimerScreenState extends State<TimerScreen> {
       if (!mounted) return;
       if (state is AsyncData<AppSettingsModel>) {
         setState(() => _currentSettings = state.data);
+        // WindowService.enterMiniMode() unconditionally sizes the window to
+        // the vinyl card's AppStyling.miniWindowSize before settings are
+        // known. Whenever widgetStyle becomes known/changes, re-correct the
+        // live window size — for whichever base state (card or pill) is
+        // currently active — so this never fights the resize calls already
+        // triggered by note/picker toggles.
+        _syncBaseWindowSize();
       }
     });
     _settings.load();
     _projects.load();
+  }
+
+  bool get _isBar => _currentSettings.widgetStyle == 'bar';
+
+  // The right base *card* size for the current style — single source of
+  // truth reused by every resize call that needs to land back on "the
+  // card", so the size choice never gets re-derived inline.
+  Size get _baseCardSize => _isBar ? AppStyling.miniBarCardSize : AppStyling.miniCardSize;
+
+  // The right base *pill* size for the current style — mirrors
+  // _baseCardSize. Vinyl's pill is unaffected by widgetStyle (it always
+  // renders _Pill at AppStyling.miniPillSize); the bar_ pill gets its own
+  // narrower size.
+  Size get _basePillSize => _isBar ? AppStyling.miniBarPillSize : AppStyling.miniPillSize;
+
+  Future<void> _syncBaseWindowSize() async {
+    // Guard on "no note, no picker open" only — this now corrects both
+    // the base card state and the base pill state, since either one can
+    // be sitting at the wrong size if widgetStyle changes underneath it
+    // (e.g. a pill-state user flips vinyl/bar externally via settings).
+    if (_noteOpen || _pickerOpen) return;
+    final target = _isPill ? _basePillSize : _baseCardSize;
+    await windowManager.setMinimumSize(Size.zero);
+    await windowManager.setSize(target);
   }
 
   QuillController _buildQuillController(String? noteJson) {
@@ -106,6 +160,22 @@ class _TimerScreenState extends State<TimerScreen> {
     } catch (_) {
       return QuillController.basic();
     }
+  }
+
+  // Note read/write is now resolved asynchronously (it may need to look up
+  // the current project and its linked NoteModel via repositories) rather
+  // than synchronously off the active session. This loads whatever note is
+  // currently resolved (running session's project, or last-tracked project
+  // while idle) once at startup; issue 011 builds the full "no note
+  // linked" / "no project" prompt UI on top of TimerController.resolveNoteState().
+  Future<void> _loadInitialNote() async {
+    final state = await _controller.resolveNoteState();
+    if (!mounted || !state.hasNoteLinked) return;
+    final loaded = _buildQuillController(state.noteJson);
+    _quillCtrl.removeListener(_onNoteChanged);
+    _quillCtrl.dispose();
+    setState(() => _quillCtrl = loaded);
+    _quillCtrl.addListener(_onNoteChanged);
   }
 
   void _onNoteChanged() {
@@ -132,25 +202,138 @@ class _TimerScreenState extends State<TimerScreen> {
       _pickerOpen = false;
     });
     await windowManager.setMinimumSize(Size.zero);
-    await windowManager.setSize(AppStyling.miniPillSize);
+    await windowManager.setSize(_basePillSize);
   }
 
   Future<void> _expandToCard() async {
     setState(() => _isPill = false);
     await windowManager.setMinimumSize(Size.zero);
-    await windowManager.setSize(AppStyling.miniCardSize);
+    await windowManager.setSize(_baseCardSize);
   }
 
   Future<void> _toggleNote() async {
-    final next = !_noteOpen;
+    if (_noteOpen) {
+      setState(() => _noteOpen = false);
+      await windowManager.setMinimumSize(Size.zero);
+      await windowManager.setSize(_baseCardSize);
+      return;
+    }
+
+    final state = await _controller.resolveNoteState();
+    if (!mounted) return;
+
+    // noProject: the rare "never tracked a single session" case — nothing
+    // sensible to create/link against, so the toggle is a deliberate no-op
+    // per issue 011 rather than opening a broken prompt.
+    if (!state.hasProject) return;
+
     setState(() {
-      _noteOpen = next;
       _pickerOpen = false;
+      _noteProjectId = state.projectId;
+    });
+
+    if (state.hasNoteLinked) {
+      await _openNoteEditor(state.noteJson);
+      return;
+    }
+
+    setState(() {
+      _noteOpen = true;
+      _noteView = NotePanelView.prompt;
     });
     await windowManager.setMinimumSize(Size.zero);
-    await windowManager.setSize(
-      next ? AppStyling.miniCardNoteSize : AppStyling.miniCardSize,
-    );
+    final promptSize =
+        _isBar ? AppStyling.miniBarCardNotePromptSize : AppStyling.miniCardNotePromptSize;
+    await windowManager.setSize(promptSize);
+  }
+
+  // Swaps in a freshly-loaded QuillController bound to [noteJson] and
+  // resizes to the editor state — shared by the direct hasNote path, and
+  // by the create/link actions below once they've resolved a note to edit.
+  Future<void> _openNoteEditor(String? noteJson) async {
+    final loaded = _buildQuillController(noteJson);
+    _quillCtrl.removeListener(_onNoteChanged);
+    _quillCtrl.dispose();
+    setState(() {
+      _quillCtrl = loaded;
+      _noteOpen = true;
+      _noteView = NotePanelView.editor;
+    });
+    _quillCtrl.addListener(_onNoteChanged);
+    await windowManager.setMinimumSize(Size.zero);
+    final noteSize = _isBar ? AppStyling.miniBarCardNoteSize : AppStyling.miniCardNoteSize;
+    await windowManager.setSize(noteSize);
+    _noteFocus.requestFocus();
+  }
+
+  // "create new" from the note-link prompt — builds a NoteModel directly
+  // (mirrors project_detail_drawer.dart's _NoteSection._createAndLink),
+  // links it to the resolved project, then opens it ready to type.
+  Future<void> _createNote() async {
+    final projectId = _noteProjectId;
+    if (projectId == null || _noteBusy) return;
+    setState(() => _noteBusy = true);
+    final now = DateTime.now();
+    final note = NoteModel(id: const Uuid().v4(), noteJson: '', createdAt: now, updatedAt: now);
+    await _notesRepo.save(note);
+    final project = await _projectsRepo.getById(projectId);
+    if (project != null) {
+      await _projectsRepo.save(project.copyWith(noteId: note.id));
+    }
+    if (!mounted) return;
+    setState(() => _noteBusy = false);
+    await _openNoteEditor(note.noteJson);
+  }
+
+  // "link existing" from the note-link prompt — switches to the picker
+  // sub-view and loads notes that no live project currently points at,
+  // mirroring project_detail_drawer.dart's _LinkExistingNoteDialog._load.
+  Future<void> _openLinkPicker() async {
+    setState(() {
+      _noteView = NotePanelView.linkPicker;
+      _noteBusy = true;
+    });
+    await windowManager.setMinimumSize(Size.zero);
+    final linkSize =
+        _isBar ? AppStyling.miniBarCardNoteLinkSize : AppStyling.miniCardNoteLinkSize;
+    await windowManager.setSize(linkSize);
+
+    final allNotes = await _notesRepo.getAll();
+    final allProjects = await _projectsRepo.getAll();
+    final linkedIds = allProjects.map((p) => p.noteId).whereType<String>().toSet();
+    final unlinked = allNotes.where((n) => !linkedIds.contains(n.id)).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    if (!mounted) return;
+    setState(() {
+      _unlinkedNotes = unlinked;
+      _noteBusy = false;
+    });
+  }
+
+  Future<void> _backToNotePrompt() async {
+    setState(() {
+      _noteView = NotePanelView.prompt;
+      _unlinkedNotes = [];
+    });
+    await windowManager.setMinimumSize(Size.zero);
+    final promptSize =
+        _isBar ? AppStyling.miniBarCardNotePromptSize : AppStyling.miniCardNotePromptSize;
+    await windowManager.setSize(promptSize);
+  }
+
+  // Selecting a note from the link-existing picker — links it to the
+  // resolved project, then opens it.
+  Future<void> _linkExistingNote(NoteModel note) async {
+    final projectId = _noteProjectId;
+    if (projectId == null || _noteBusy) return;
+    setState(() => _noteBusy = true);
+    final project = await _projectsRepo.getById(projectId);
+    if (project != null) {
+      await _projectsRepo.save(project.copyWith(noteId: note.id));
+    }
+    if (!mounted) return;
+    setState(() => _noteBusy = false);
+    await _openNoteEditor(note.noteJson);
   }
 
   Future<void> _togglePicker() async {
@@ -160,9 +343,16 @@ class _TimerScreenState extends State<TimerScreen> {
       _noteOpen = false;
     });
     await windowManager.setMinimumSize(Size.zero);
-    await windowManager.setSize(
-      next ? AppStyling.miniCardPickerSize : AppStyling.miniCardSize,
-    );
+    if (_isPill) {
+      // Only the bar_ pill wires up a picker today — the vinyl pill has
+      // no project-row affordance at all — but branch on the current
+      // pill's own base size regardless, so this stays correct if that
+      // ever changes.
+      await windowManager.setSize(next ? AppStyling.miniBarPillPickerSize : _basePillSize);
+      return;
+    }
+    final pickerSize = _isBar ? AppStyling.miniBarCardPickerSize : AppStyling.miniCardPickerSize;
+    await windowManager.setSize(next ? pickerSize : _baseCardSize);
   }
 
   Future<void> _selectProject(ProjectModel project) async {
@@ -175,7 +365,10 @@ class _TimerScreenState extends State<TimerScreen> {
     );
     setState(() => _pickerOpen = false);
     await windowManager.setMinimumSize(Size.zero);
-    await windowManager.setSize(AppStyling.miniCardSize);
+    // Land back on whichever base is actually active — bar pill, bar
+    // card, or vinyl card — not just "the card" unconditionally, since
+    // the picker is now reachable from the bar_ pill too.
+    await windowManager.setSize(_isPill ? _basePillSize : _baseCardSize);
   }
 
   String _fmt(Duration d) {
@@ -200,21 +393,59 @@ class _TimerScreenState extends State<TimerScreen> {
           opacity: fadeEnabled && !_hovered ? idleOpacity : 1.0,
           child: StreamStateBuilder<TimerUiData>(
             state: _controller.uiState,
-            builder: (context, data) => _isPill ? _Pill(
+            builder: (context, data) => _isPill ? (_isBar ? BarPill(
+              elapsed: _fmt(data.elapsed),
+              media: _currentMedia,
+              projectName: data.projectName,
+              activeProjectId: data.projectId,
+              pickerOpen: _pickerOpen,
+              projects: _projectList,
+              onExpand: _expandToCard,
+              onTogglePicker: _togglePicker,
+              onSelectProject: _selectProject,
+            ) : _Pill(
               elapsed: _fmt(data.elapsed),
               media: _currentMedia,
               onExpand: _expandToCard,
-            ) : _Card(
+            )) : _isBar ? BarCard(
               elapsed: _fmt(data.elapsed),
               data: data,
               media: _currentMedia,
               noteOpen: _noteOpen,
+              noteView: _noteView,
+              noteBusy: _noteBusy,
+              unlinkedNotes: _unlinkedNotes,
               pickerOpen: _pickerOpen,
               projects: _projectList,
               quillCtrl: _quillCtrl,
               noteFocus: _noteFocus,
               noteScroll: _noteScroll,
               onToggleNote: _toggleNote,
+              onCreateNote: _createNote,
+              onLinkExisting: _openLinkPicker,
+              onSelectNote: _linkExistingNote,
+              onBackToPrompt: _backToNotePrompt,
+              onTogglePicker: _togglePicker,
+              onSelectProject: _selectProject,
+              onExpand: () => locator.get<WindowService>().exitMiniMode(),
+            ) : _Card(
+              elapsed: _fmt(data.elapsed),
+              data: data,
+              media: _currentMedia,
+              noteOpen: _noteOpen,
+              noteView: _noteView,
+              noteBusy: _noteBusy,
+              unlinkedNotes: _unlinkedNotes,
+              pickerOpen: _pickerOpen,
+              projects: _projectList,
+              quillCtrl: _quillCtrl,
+              noteFocus: _noteFocus,
+              noteScroll: _noteScroll,
+              onToggleNote: _toggleNote,
+              onCreateNote: _createNote,
+              onLinkExisting: _openLinkPicker,
+              onSelectNote: _linkExistingNote,
+              onBackToPrompt: _backToNotePrompt,
               onTogglePicker: _togglePicker,
               onSelectProject: _selectProject,
               onCollapse: _collapseToPill,
@@ -237,12 +468,19 @@ class _Card extends StatelessWidget {
   final TimerUiData data;
   final MediaInfo media;
   final bool noteOpen;
+  final NotePanelView noteView;
+  final bool noteBusy;
+  final List<NoteModel> unlinkedNotes;
   final bool pickerOpen;
   final List<ProjectModel> projects;
   final QuillController quillCtrl;
   final FocusNode noteFocus;
   final ScrollController noteScroll;
   final VoidCallback onToggleNote;
+  final VoidCallback onCreateNote;
+  final VoidCallback onLinkExisting;
+  final ValueChanged<NoteModel> onSelectNote;
+  final VoidCallback onBackToPrompt;
   final VoidCallback onTogglePicker;
   final ValueChanged<ProjectModel> onSelectProject;
   final VoidCallback onCollapse;
@@ -256,12 +494,19 @@ class _Card extends StatelessWidget {
     required this.data,
     required this.media,
     required this.noteOpen,
+    required this.noteView,
+    required this.noteBusy,
+    required this.unlinkedNotes,
     required this.pickerOpen,
     required this.projects,
     required this.quillCtrl,
     required this.noteFocus,
     required this.noteScroll,
     required this.onToggleNote,
+    required this.onCreateNote,
+    required this.onLinkExisting,
+    required this.onSelectNote,
+    required this.onBackToPrompt,
     required this.onTogglePicker,
     required this.onSelectProject,
     required this.onCollapse,
@@ -291,12 +536,19 @@ class _Card extends StatelessWidget {
             data: data,
             media: media,
             noteOpen: noteOpen,
+            noteView: noteView,
+            noteBusy: noteBusy,
+            unlinkedNotes: unlinkedNotes,
             pickerOpen: pickerOpen,
             projects: projects,
             quillCtrl: quillCtrl,
             noteFocus: noteFocus,
             noteScroll: noteScroll,
             onToggleNote: onToggleNote,
+            onCreateNote: onCreateNote,
+            onLinkExisting: onLinkExisting,
+            onSelectNote: onSelectNote,
+            onBackToPrompt: onBackToPrompt,
             onTogglePicker: onTogglePicker,
             onSelectProject: onSelectProject,
             onCollapse: onCollapse,
@@ -326,12 +578,19 @@ class _CardBox extends StatelessWidget {
   final TimerUiData data;
   final MediaInfo media;
   final bool noteOpen;
+  final NotePanelView noteView;
+  final bool noteBusy;
+  final List<NoteModel> unlinkedNotes;
   final bool pickerOpen;
   final List<ProjectModel> projects;
   final QuillController quillCtrl;
   final FocusNode noteFocus;
   final ScrollController noteScroll;
   final VoidCallback onToggleNote;
+  final VoidCallback onCreateNote;
+  final VoidCallback onLinkExisting;
+  final ValueChanged<NoteModel> onSelectNote;
+  final VoidCallback onBackToPrompt;
   final VoidCallback onTogglePicker;
   final ValueChanged<ProjectModel> onSelectProject;
   final VoidCallback onCollapse;
@@ -345,12 +604,19 @@ class _CardBox extends StatelessWidget {
     required this.data,
     required this.media,
     required this.noteOpen,
+    required this.noteView,
+    required this.noteBusy,
+    required this.unlinkedNotes,
     required this.pickerOpen,
     required this.projects,
     required this.quillCtrl,
     required this.noteFocus,
     required this.noteScroll,
     required this.onToggleNote,
+    required this.onCreateNote,
+    required this.onLinkExisting,
+    required this.onSelectNote,
+    required this.onBackToPrompt,
     required this.onTogglePicker,
     required this.onSelectProject,
     required this.onCollapse,
@@ -424,7 +690,7 @@ class _CardBox extends StatelessWidget {
                       const SizedBox(height: 3),
                       // Now playing
                       if (media.hasTrack)
-                        _MarqueeText(
+                        MarqueeText(
                           text: 'now playing · ${media.title}',
                           style: spaceMono(size: 10, color: _kAccent),
                         )
@@ -483,13 +749,20 @@ class _CardBox extends StatelessWidget {
               ),
             ],
           ),
-          if (noteOpen) NotePanelWidget(
-            controller: quillCtrl,
-            focusNode: noteFocus,
-            scrollController: noteScroll,
+          if (noteOpen) NotePanelArea(
+            view: noteView,
+            busy: noteBusy,
+            unlinkedNotes: unlinkedNotes,
+            quillCtrl: quillCtrl,
+            noteFocus: noteFocus,
+            noteScroll: noteScroll,
+            onCreateNote: onCreateNote,
+            onLinkExisting: onLinkExisting,
+            onSelectNote: onSelectNote,
+            onBackToPrompt: onBackToPrompt,
           ),
           // Project picker panel
-          if (pickerOpen) _ProjectPicker(
+          if (pickerOpen) ProjectPicker(
             projects: projects,
             activeProjectId: data.projectId,
             onSelect: onSelectProject,
@@ -576,123 +849,6 @@ class _Pill extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ── Project picker panel ──────────────────────────────────────────────────────
-
-class _ProjectPicker extends StatelessWidget {
-  final List<ProjectModel> projects;
-  final String? activeProjectId;
-  final ValueChanged<ProjectModel> onSelect;
-
-  const _ProjectPicker({
-    required this.projects,
-    required this.activeProjectId,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(height: 1, color: _kLine),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 140),
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            shrinkWrap: true,
-            itemCount: projects.length,
-            itemBuilder: (_, i) {
-              final p = projects[i];
-              final isActive = p.id == activeProjectId;
-              return _ProjectRow(
-                project: p,
-                isActive: isActive,
-                onTap: () => onSelect(p),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProjectRow extends StatefulWidget {
-  final ProjectModel project;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _ProjectRow({
-    required this.project,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  @override
-  State<_ProjectRow> createState() => _ProjectRowState();
-}
-
-class _ProjectRowState extends State<_ProjectRow> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Color(
-      int.parse('FF${widget.project.colorHex.replaceFirst('#', '')}', radix: 16),
-    );
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          color: _hovered
-              ? Colors.black.withValues(alpha: 0.04)
-              : Colors.transparent,
-          child: Row(
-            children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color,
-                ),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  widget.project.name,
-                  style: spaceMono(
-                    size: 9,
-                    color: widget.isActive ? _kInk : _kMuted,
-                    weight: widget.isActive ? FontWeight.w700 : FontWeight.w400,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (widget.isActive)
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _kAccent,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -826,95 +982,3 @@ class _DragArea extends StatelessWidget {
   }
 }
 
-// ── Marquee ───────────────────────────────────────────────────────────────────
-
-class _MarqueeText extends StatefulWidget {
-  final String text;
-  final TextStyle style;
-
-  const _MarqueeText({required this.text, required this.style});
-
-  @override
-  State<_MarqueeText> createState() => _MarqueeTextState();
-}
-
-class _MarqueeTextState extends State<_MarqueeText>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  double _textWidth = 0;
-  double _lineHeight = 12;
-
-  static const double _gap = 36.0;
-  static const double _speed = 38.0; // px per second
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
-  }
-
-  @override
-  void didUpdateWidget(_MarqueeText old) {
-    super.didUpdateWidget(old);
-    if (old.text != widget.text) {
-      _ctrl.stop();
-      _ctrl.reset();
-      WidgetsBinding.instance.addPostFrameCallback((_) => _start());
-    }
-  }
-
-  void _start() {
-    if (!mounted) return;
-    final tp = TextPainter(
-      text: TextSpan(text: widget.text, style: widget.style),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    _textWidth = tp.width;
-    _lineHeight = tp.height;
-    if (_textWidth <= 0) return;
-    _ctrl.duration = Duration(
-      milliseconds: ((_textWidth + _gap) / _speed * 1000).round(),
-    );
-    _ctrl.repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_textWidth == 0) {
-      return Text(widget.text, style: widget.style, maxLines: 1);
-    }
-    return SizedBox(
-      height: _lineHeight,
-      child: ClipRect(
-        child: AnimatedBuilder(
-          animation: _ctrl,
-          builder: (_, __) {
-            final offset = _ctrl.value * (_textWidth + _gap);
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  top: 0,
-                  left: -offset,
-                  child: Text(widget.text, style: widget.style),
-                ),
-                Positioned(
-                  top: 0,
-                  left: _textWidth + _gap - offset,
-                  child: Text(widget.text, style: widget.style),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}

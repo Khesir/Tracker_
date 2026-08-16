@@ -56,5 +56,12 @@ class ProjectsController {
     await load();
   }
 
+  /// Clears the given project's linked note (`noteId` -> null) without
+  /// touching the note itself or any other project that may reference it.
+  Future<void> unlinkNote(String projectId) async {
+    await _repo.unlinkNote(projectId);
+    await load();
+  }
+
   void dispose() => uiState.dispose();
 }
