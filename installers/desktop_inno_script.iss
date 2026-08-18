@@ -6,6 +6,11 @@
 #define MyAppURL "https://keep-track.khesir.com/"
 #define MyAppExeName "time_track.exe"
 
+; SourcePath is the directory containing this .iss file (installers\).
+; RepoRoot is the project root, one level up.
+#define RepoRoot SourcePath + "..\"
+#define ReleaseDir RepoRoot + "build\windows\x64\runner\Release"
+
 [Setup]
 AppId={{C3E7F214-9A51-4D72-B8F3-6A2D9E4C1B08}
 AppName={#MyAppName}
@@ -19,9 +24,9 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
-OutputDir=C:\Users\ajriz\Documents\Projects\keep-track\time-track\installers
+OutputDir={#SourcePath}
 OutputBaseFilename=trackr-v0.1.3
-SetupIconFile=C:\Users\ajriz\Documents\Projects\keep-track\time-track\windows\runner\resources\app_icon.ico
+SetupIconFile={#RepoRoot}windows\runner\resources\app_icon.ico
 SolidCompression=yes
 WizardStyle=modern
 
@@ -32,9 +37,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "C:\Users\ajriz\Documents\Projects\keep-track\time-track\build\windows\x64\runner\Release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\ajriz\Documents\Projects\keep-track\time-track\build\windows\x64\runner\Release\*.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\ajriz\Documents\Projects\keep-track\time-track\build\windows\x64\runner\Release\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#ReleaseDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ReleaseDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ReleaseDir}\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
