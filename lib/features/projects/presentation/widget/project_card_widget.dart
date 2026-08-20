@@ -142,13 +142,14 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
                     ),
                   ),
                 ),
-                SizedBox(
-                  width: 128,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 128, maxWidth: 240),
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 13, 0, 13),
+                    padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
                           children: [
