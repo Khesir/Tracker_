@@ -96,7 +96,7 @@ class TimerController {
     required String projectId,
     required String projectName,
   }) async {
-    if (uiState.state.isRunning) return;
+    if (uiState.state.isRunning || uiState.state.isPaused) return;
 
     final project = await _projectsRepo.getById(projectId);
 

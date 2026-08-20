@@ -140,6 +140,32 @@ void main() {
 
       expect(calls, ['softDelete:p1']);
     });
+
+    test('stops the paused session first, then soft-deletes, when the session belongs to this project',
+        () async {
+      final timer = FakeTimerController(
+        const TimerUiData(status: TimerStatus.paused, projectId: 'p1'),
+        calls,
+      );
+      final controller = ProjectsController(repo, timer);
+
+      await controller.softDelete('p1');
+
+      expect(calls, ['timer.stop', 'softDelete:p1']);
+    });
+
+    test('skips the stop step when the paused session belongs to a different project',
+        () async {
+      final timer = FakeTimerController(
+        const TimerUiData(status: TimerStatus.paused, projectId: 'p2'),
+        calls,
+      );
+      final controller = ProjectsController(repo, timer);
+
+      await controller.softDelete('p1');
+
+      expect(calls, ['softDelete:p1']);
+    });
   });
 
   group('restore', () {

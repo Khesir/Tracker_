@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import '../state/stream_builder_widget.dart';
 import '../theme/app_styling.dart';
 import '../theme/app_theme.dart';
 import '../window/window_service.dart';
@@ -58,6 +59,7 @@ class DesktopTitleBar extends StatelessWidget {
                   ],
                 ),
               ),
+              const _LiveTimer(),
               const _LiveIndicator(),
               const SizedBox(width: 12),
               const _NowPlayingIndicator(),
@@ -69,6 +71,43 @@ class DesktopTitleBar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LiveTimer extends StatelessWidget {
+  const _LiveTimer();
+
+  String _fmt(Duration d) {
+    final h = d.inHours.toString().padLeft(2, '0');
+    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$h:$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = locator.get<TimerController>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
+    final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+
+    return StreamStateBuilder<TimerUiData>(
+      state: ctrl.uiState,
+      builder: (context, data) {
+        if (!(data.isRunning || data.isPaused)) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(left: 10),
+          child: Text(
+            _fmt(data.elapsed),
+            style: spaceMono(
+              size: 11,
+              weight: FontWeight.w700,
+              color: data.isPaused ? muted : accent,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -86,6 +125,7 @@ class _LiveIndicatorState extends State<_LiveIndicator>
   late final Animation<double> _opacity;
   late final StreamSubscription<TimerUiData> _sub;
   bool _isRunning = false;
+  bool _isPaused = false;
 
   @override
   void initState() {
@@ -100,12 +140,16 @@ class _LiveIndicatorState extends State<_LiveIndicator>
 
     final ctrl = locator.get<TimerController>();
     _isRunning = ctrl.uiState.state.isRunning;
+    _isPaused = ctrl.uiState.state.isPaused;
     if (_isRunning) _pulse.repeat(reverse: true);
 
     _sub = ctrl.uiState.stream.listen((data) {
       if (!mounted) return;
-      if (data.isRunning != _isRunning) {
-        setState(() => _isRunning = data.isRunning);
+      if (data.isRunning != _isRunning || data.isPaused != _isPaused) {
+        setState(() {
+          _isRunning = data.isRunning;
+          _isPaused = data.isPaused;
+        });
         if (_isRunning) {
           _pulse.repeat(reverse: true);
         } else {
@@ -129,7 +173,7 @@ class _LiveIndicatorState extends State<_LiveIndicator>
     final muted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
     final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
     final color = _isRunning ? accent : muted;
-    final label = _isRunning ? '• live' : 'idle';
+    final label = _isRunning ? '• live' : (_isPaused ? 'paused' : 'idle');
 
     return Padding(
       padding: const EdgeInsets.only(left: 10),

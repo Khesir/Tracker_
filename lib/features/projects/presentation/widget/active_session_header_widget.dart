@@ -24,7 +24,7 @@ class ActiveSessionHeaderWidget extends StatelessWidget {
     return StreamStateBuilder<TimerUiData>(
       state: controller.uiState,
       builder: (context, data) {
-        if (!data.isRunning) return const SizedBox.shrink();
+        if (!data.isRunning && !data.isPaused) return const SizedBox.shrink();
         return _ActiveHeader(data: data, formatElapsed: _formatElapsed);
       },
     );
@@ -73,10 +73,10 @@ class _ActiveHeader extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                _PulsingDot(color: accent),
+                _PulsingDot(color: accent, isPaused: data.isPaused),
                 const SizedBox(width: 6),
                 Text(
-                  '${data.projectName} — running',
+                  '${data.projectName} — ${data.isPaused ? 'paused' : 'running'}',
                   style: dmSans(size: 12, color: textMuted),
                 ),
               ],
@@ -90,7 +90,8 @@ class _ActiveHeader extends StatelessWidget {
 
 class _PulsingDot extends StatefulWidget {
   final Color color;
-  const _PulsingDot({required this.color});
+  final bool isPaused;
+  const _PulsingDot({required this.color, this.isPaused = false});
 
   @override
   State<_PulsingDot> createState() => _PulsingDotState();
@@ -106,7 +107,18 @@ class _PulsingDotState extends State<_PulsingDot>
     _anim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    );
+    if (!widget.isPaused) _anim.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PulsingDot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPaused && _anim.isAnimating) {
+      _anim.stop();
+    } else if (!widget.isPaused && !_anim.isAnimating) {
+      _anim.repeat(reverse: true);
+    }
   }
 
   @override
@@ -124,7 +136,9 @@ class _PulsingDotState extends State<_PulsingDot>
         height: 7,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: widget.color.withValues(alpha: 0.4 + (_anim.value * 0.6)),
+          color: widget.isPaused
+              ? widget.color.withValues(alpha: 0.35)
+              : widget.color.withValues(alpha: 0.4 + (_anim.value * 0.6)),
         ),
       ),
     );

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/models/note_model.dart';
 import '../../../../core/models/project_model.dart';
 import '../../../../core/models/session_model.dart';
+import '../../../../core/state/stream_builder_widget.dart';
 import '../../../../core/state/stream_state.dart';
 import '../../../../core/theme/app_styling.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -13,6 +14,7 @@ import '../../../notes/domain/repository/notes_repository.dart';
 import '../../../sessions/domain/controller/sessions_controller.dart';
 import '../../../sessions/presentation/sheets/session_detail_sheet.dart';
 import '../../../timer/domain/controller/timer_controller.dart';
+import '../../../timer/presentation/state/timer_ui_state.dart';
 import '../../../timer/presentation/widget/session_note_widget.dart';
 import '../../domain/controller/projects_controller.dart';
 import '../dialogs/project_form_dialog.dart';
@@ -26,7 +28,6 @@ class ProjectDetailDrawer extends StatelessWidget {
   final ProjectsController projectsController;
   final TimerController timerController;
   final NotesRepository notesRepository;
-  final bool isActive;
 
   const ProjectDetailDrawer({
     super.key,
@@ -35,7 +36,6 @@ class ProjectDetailDrawer extends StatelessWidget {
     required this.projectsController,
     required this.timerController,
     required this.notesRepository,
-    required this.isActive,
   });
 
   static Future<void> show(
@@ -45,7 +45,6 @@ class ProjectDetailDrawer extends StatelessWidget {
     required ProjectsController projectsController,
     required TimerController timerController,
     required NotesRepository notesRepository,
-    required bool isActive,
     required String drawerStyle,
   }) {
     final content = ProjectDetailDrawer(
@@ -54,7 +53,6 @@ class ProjectDetailDrawer extends StatelessWidget {
       projectsController: projectsController,
       timerController: timerController,
       notesRepository: notesRepository,
-      isActive: isActive,
     );
 
     if (drawerStyle == 'bottom') {
@@ -123,6 +121,23 @@ class ProjectDetailDrawer extends StatelessWidget {
     await timerController.start(projectId: project.id, projectName: project.name);
     projectsController.load();
     if (context.mounted) Navigator.pop(context);
+  }
+
+  Future<void> _stopSession(BuildContext context) async {
+    await timerController.stop();
+    projectsController.load();
+    if (context.mounted) Navigator.pop(context);
+  }
+
+  // Pause/resume neither change persisted totals nor end the session, so
+  // unlike start/stop they don't reload ProjectsController or close the
+  // drawer — the drawer just re-renders with the new TimerStatus.
+  Future<void> _pauseSession() async {
+    await timerController.pause();
+  }
+
+  Future<void> _resumeSession() async {
+    await timerController.unpause();
   }
 
   Future<void> _editProject(BuildContext context) async {
@@ -202,7 +217,7 @@ class ProjectDetailDrawer extends StatelessWidget {
     final body = _DrawerBody(
       project: project,
       projectColor: _projectColor,
-      isActive: isActive,
+      timerController: timerController,
       totalSeconds: totalSeconds,
       todaySeconds: todaySeconds,
       recentSessions: recentSessions,
@@ -214,6 +229,9 @@ class ProjectDetailDrawer extends StatelessWidget {
       fmtDuration: _fmtDuration,
       onSessionTap: (session) => _openSession(context, session),
       onStart: () => _startSession(context),
+      onStop: () => _stopSession(context),
+      onPause: () => _pauseSession(),
+      onResume: () => _resumeSession(),
       onEdit: () => _editProject(context),
       onDelete: () => _deleteProject(context, isDark: isDark, textMuted: textMuted),
       notesRepository: notesRepository,
@@ -243,7 +261,7 @@ class ProjectDetailDrawer extends StatelessWidget {
 class _DrawerBody extends StatelessWidget {
   final ProjectModel project;
   final Color projectColor;
-  final bool isActive;
+  final TimerController timerController;
   final int totalSeconds;
   final int todaySeconds;
   final List<SessionModel> recentSessions;
@@ -255,6 +273,9 @@ class _DrawerBody extends StatelessWidget {
   final String Function(int) fmtDuration;
   final ValueChanged<SessionModel> onSessionTap;
   final VoidCallback onStart;
+  final VoidCallback onStop;
+  final VoidCallback onPause;
+  final VoidCallback onResume;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final NotesRepository notesRepository;
@@ -263,7 +284,7 @@ class _DrawerBody extends StatelessWidget {
   const _DrawerBody({
     required this.project,
     required this.projectColor,
-    required this.isActive,
+    required this.timerController,
     required this.totalSeconds,
     required this.todaySeconds,
     required this.recentSessions,
@@ -275,6 +296,9 @@ class _DrawerBody extends StatelessWidget {
     required this.fmtDuration,
     required this.onSessionTap,
     required this.onStart,
+    required this.onStop,
+    required this.onPause,
+    required this.onResume,
     required this.onEdit,
     required this.onDelete,
     required this.notesRepository,
@@ -308,6 +332,15 @@ class _DrawerBody extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              _DrawerOverflowMenu(
+                isDark: isDark,
+                bg: bg,
+                border: border,
+                textMuted: textMuted,
+                onEdit: onEdit,
+                onDelete: onDelete,
+              ),
+              const SizedBox(width: 14),
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Icon(Icons.close, size: 18, color: textMuted),
@@ -407,39 +440,125 @@ class _DrawerBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           decoration: BoxDecoration(border: Border(top: BorderSide(color: border))),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _ActionButton(
-                      label: isActive ? 'session_active_' : 'start_session_',
-                      isDark: isDark,
-                      onTap: isActive ? null : onStart,
+          // Reactive on TimerController.uiState so pause/resume/stop (which
+          // don't pop the drawer or reload ProjectsController) still flip
+          // this row's button set live, with no stale label.
+          child: StreamStateBuilder<TimerUiData>(
+            state: timerController.uiState,
+            builder: (context, data) {
+              final isRunningHere = data.isRunning && data.projectId == project.id;
+              final isPausedHere = data.isPaused && data.projectId == project.id;
+
+              if (isPausedHere) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _ActionButton(
+                        label: 'stop_session_',
+                        isDark: isDark,
+                        onTap: onStop,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _ActionButton(
-                      label: 'edit_',
-                      isDark: isDark,
-                      onTap: onEdit,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _ActionButton(
+                        label: 'resume_session_',
+                        isDark: isDark,
+                        onTap: onResume,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
+                  ],
+                );
+              }
+
+              if (isRunningHere) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _ActionButton(
+                        label: 'stop_session_',
+                        isDark: isDark,
+                        onTap: onStop,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _ActionButton(
+                        label: 'pause_session_',
+                        isDark: isDark,
+                        onTap: onPause,
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return SizedBox(
                 width: double.infinity,
                 child: _ActionButton(
-                  label: 'delete_',
+                  label: 'start_session_',
                   isDark: isDark,
-                  isDestructive: true,
-                  onTap: onDelete,
+                  onTap: onStart,
                 ),
-              ),
-            ],
+              );
+            },
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Triple-dot overflow menu in the drawer header, replacing the old
+/// full-width edit_/delete_ rows that used to live in the bottom action
+/// area. Reuses the drawer's existing onEdit/onDelete callbacks unchanged.
+class _DrawerOverflowMenu extends StatelessWidget {
+  final bool isDark;
+  final Color bg;
+  final Color border;
+  final Color textMuted;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _DrawerOverflowMenu({
+    required this.isDark,
+    required this.bg,
+    required this.border,
+    required this.textMuted,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+
+    return PopupMenuButton<String>(
+      tooltip: '',
+      color: bg,
+      elevation: 4,
+      padding: EdgeInsets.zero,
+      splashRadius: 16,
+      offset: const Offset(0, 22),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: border),
+      ),
+      icon: Icon(Icons.more_vert, size: 18, color: textMuted),
+      onSelected: (value) {
+        if (value == 'edit') onEdit();
+        if (value == 'delete') onDelete();
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          value: 'edit',
+          height: 36,
+          child: Text('edit_', style: spaceMono(size: 12, color: accent)),
+        ),
+        PopupMenuItem<String>(
+          value: 'delete',
+          height: 36,
+          child: Text('delete_', style: spaceMono(size: 12, color: const Color(0xFFEF4444))),
         ),
       ],
     );
@@ -524,14 +643,12 @@ class _RecentSessionRowState extends State<_RecentSessionRow> {
 class _ActionButton extends StatefulWidget {
   final String label;
   final bool isDark;
-  final bool isDestructive;
   final VoidCallback? onTap;
 
   const _ActionButton({
     required this.label,
     required this.isDark,
     required this.onTap,
-    this.isDestructive = false,
   });
 
   @override
@@ -545,7 +662,6 @@ class _ActionButtonState extends State<_ActionButton> {
   Widget build(BuildContext context) {
     final border = widget.isDark ? AppStyling.borderDark : AppStyling.borderLight;
     final accent = widget.isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
-    final color = widget.isDestructive ? const Color(0xFFEF4444) : accent;
     final disabled = widget.onTap == null;
 
     return MouseRegion(
@@ -558,14 +674,14 @@ class _ActionButtonState extends State<_ActionButton> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: !disabled && _hovered ? color.withValues(alpha: 0.1) : Colors.transparent,
+            color: !disabled && _hovered ? accent.withValues(alpha: 0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: border),
           ),
           alignment: Alignment.center,
           child: Text(
             widget.label,
-            style: spaceMono(size: 11, color: disabled ? color.withValues(alpha: 0.4) : color),
+            style: spaceMono(size: 11, color: disabled ? accent.withValues(alpha: 0.4) : accent),
           ),
         ),
       ),

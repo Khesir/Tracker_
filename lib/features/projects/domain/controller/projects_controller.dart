@@ -32,7 +32,8 @@ class ProjectsController {
   }
 
   Future<void> softDelete(String id) async {
-    if (_timer.uiState.state.isRunning && _timer.uiState.state.projectId == id) {
+    final timerState = _timer.uiState.state;
+    if ((timerState.isRunning || timerState.isPaused) && timerState.projectId == id) {
       await _timer.stop();
     }
     await _repo.softDelete(id);

@@ -218,6 +218,36 @@ void main() {
     });
   });
 
+  group('start() while paused', () {
+    test('no-ops for the same project — active session stays the paused one', () async {
+      projectsRepo.byId['p1'] = _project(id: 'p1');
+      final controller = buildController();
+      await controller.start(projectId: 'p1', projectName: 'Project p1');
+      final pausedSession = timerRepo.active;
+      await controller.pause();
+
+      await controller.start(projectId: 'p1', projectName: 'Project p1');
+
+      expect(controller.uiState.state.isPaused, isTrue);
+      expect(timerRepo.active, same(pausedSession));
+    });
+
+    test('no-ops for a different project — active session stays the paused one', () async {
+      projectsRepo.byId['p1'] = _project(id: 'p1');
+      projectsRepo.byId['p2'] = _project(id: 'p2');
+      final controller = buildController();
+      await controller.start(projectId: 'p1', projectName: 'Project p1');
+      final pausedSession = timerRepo.active;
+      await controller.pause();
+
+      await controller.start(projectId: 'p2', projectName: 'Project p2');
+
+      expect(controller.uiState.state.isPaused, isTrue);
+      expect(controller.uiState.state.projectId, 'p1');
+      expect(timerRepo.active, same(pausedSession));
+    });
+  });
+
   group('resolveNoteState() while running', () {
     test('resolves against the active session\'s project and reports hasNote', () async {
       projectsRepo.byId['p1'] = _project(id: 'p1', noteId: 'n1');

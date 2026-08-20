@@ -1,26 +1,32 @@
 import 'package:flutter/material.dart';
 import '../../../../core/models/project_model.dart';
+import '../../../../core/state/stream_builder_widget.dart';
 import '../../../../core/theme/app_styling.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../timer/presentation/state/timer_ui_state.dart';
 
 class ProjectCardWidget extends StatefulWidget {
   final ProjectModel project;
   final int loggedSeconds;
   final int todaySeconds;
-  final bool isActive;
+  final TimerUiState timerUiState;
   final VoidCallback onTap;
   final VoidCallback onStart;
   final VoidCallback onStop;
+  final VoidCallback onPause;
+  final VoidCallback onResume;
 
   const ProjectCardWidget({
     super.key,
     required this.project,
     required this.loggedSeconds,
     required this.todaySeconds,
-    required this.isActive,
+    required this.timerUiState,
     required this.onTap,
     required this.onStart,
     required this.onStop,
+    required this.onPause,
+    required this.onResume,
   });
 
   @override
@@ -34,19 +40,48 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
         int.parse(widget.project.colorHex.replaceFirst('#', '0xFF')),
       );
 
-  String _statusLine() {
-    if (widget.isActive) {
+  String _statusLine({required bool isRunning, required bool isPaused}) {
+    if (isRunning) {
       final now = DateTime.now();
       final h = now.hour.toString().padLeft(2, '0');
       final min = now.minute.toString().padLeft(2, '0');
       return 'active · today $h:$min';
     }
-    if (widget.loggedSeconds > 0) return 'idle';
+    if (isPaused) return 'paused';
     return 'idle';
+  }
+
+  String _fmtElapsed(Duration d) {
+    final h = d.inHours.toString().padLeft(2, '0');
+    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$h:$m:$s';
   }
 
   @override
   Widget build(BuildContext context) {
+    return StreamStateBuilder<TimerUiData>(
+      state: widget.timerUiState,
+      builder: (context, timerData) {
+        final isThisProject = timerData.projectId == widget.project.id;
+        final isRunning = isThisProject && timerData.isRunning;
+        final isPaused = isThisProject && timerData.isPaused;
+        return _buildCard(
+          context,
+          isRunning: isRunning,
+          isPaused: isPaused,
+          elapsed: timerData.elapsed,
+        );
+      },
+    );
+  }
+
+  Widget _buildCard(
+    BuildContext context, {
+    required bool isRunning,
+    required bool isPaused,
+    required Duration elapsed,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppStyling.surfaceDark : AppStyling.surfaceLight;
     final borderColor = isDark ? AppStyling.borderDark : AppStyling.borderLightStrong;
@@ -65,6 +100,10 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
     final mainDur = h > 0 ? '$h' : '$m';
     final unitDur = h > 0 ? 'h' : 'm';
     final subDur = h > 0 && m > 0 ? ' ${m}m' : '';
+
+    final todayH = widget.todaySeconds ~/ 3600;
+    final todayM = (widget.todaySeconds % 3600) ~/ 60;
+    final todayLabel = todayH > 0 ? '${todayH}h' : '${todayM}m';
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -111,18 +150,44 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          widget.project.name,
-                          style: spaceMono(
-                            size: 13,
-                            weight: FontWeight.w700,
-                            color: projectColor,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                widget.project.name,
+                                style: spaceMono(
+                                  size: 13,
+                                  weight: FontWeight.w700,
+                                  color: projectColor,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isRunning || isPaused)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.access_time_rounded,
+                                        size: 10, color: textMuted),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      _fmtElapsed(elapsed),
+                                      style: spaceMono(
+                                        size: 10.5,
+                                        weight: FontWeight.w700,
+                                        color: textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          _statusLine(),
+                          _statusLine(isRunning: isRunning, isPaused: isPaused),
                           style: spaceMono(size: 10.5, color: textMuted),
                         ),
                       ],
@@ -171,80 +236,93 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        RichText(
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                text: mainDur,
-                                style: spaceMono(
-                                  size: 14,
-                                  weight: FontWeight.w800,
-                                  color: isDark
-                                      ? AppStyling.textPrimaryDark
-                                      : AppStyling.textPrimaryLight,
-                                ),
-                              ),
-                              TextSpan(
-                                text: unitDur,
-                                style: spaceMono(
-                                  size: 10,
-                                  weight: FontWeight.w400,
-                                  color: textMuted,
-                                ),
-                              ),
-                              if (subDur.isNotEmpty)
-                                TextSpan(
-                                  text: subDur,
-                                  style: spaceMono(
-                                    size: 10,
-                                    weight: FontWeight.w400,
-                                    color: textMuted,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            RichText(
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: mainDur,
+                                    style: spaceMono(
+                                      size: 14,
+                                      weight: FontWeight.w800,
+                                      color: isDark
+                                          ? AppStyling.textPrimaryDark
+                                          : AppStyling.textPrimaryLight,
+                                    ),
                                   ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        if (widget.isActive)
-                          MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: widget.onStop,
-                              child: Container(
-                                width: 26,
-                                height: 26,
-                                decoration: BoxDecoration(
-                                  color: projectColor.withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.stop_rounded,
-                                  size: 14,
-                                  color: projectColor,
-                                ),
+                                  TextSpan(
+                                    text: unitDur,
+                                    style: spaceMono(
+                                      size: 10,
+                                      weight: FontWeight.w400,
+                                      color: textMuted,
+                                    ),
+                                  ),
+                                  if (subDur.isNotEmpty)
+                                    TextSpan(
+                                      text: subDur,
+                                      style: spaceMono(
+                                        size: 10,
+                                        weight: FontWeight.w400,
+                                        color: textMuted,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'today $todayLabel',
+                              style: spaceMono(size: 9, color: textMuted),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 10),
+                        if (isRunning)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _CardIconButton(
+                                icon: Icons.stop_rounded,
+                                color: projectColor,
+                                onTap: widget.onStop,
+                              ),
+                              const SizedBox(width: 6),
+                              _CardIconButton(
+                                icon: Icons.pause_rounded,
+                                color: projectColor,
+                                onTap: widget.onPause,
+                              ),
+                            ],
+                          )
+                        else if (isPaused)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _CardIconButton(
+                                icon: Icons.stop_rounded,
+                                color: projectColor,
+                                onTap: widget.onStop,
+                              ),
+                              const SizedBox(width: 6),
+                              _CardIconButton(
+                                icon: Icons.play_arrow_rounded,
+                                color: projectColor,
+                                onTap: widget.onResume,
+                              ),
+                            ],
                           )
                         else
                           AnimatedOpacity(
                             opacity: _hovered ? 1.0 : 0.0,
                             duration: const Duration(milliseconds: 150),
-                            child: GestureDetector(
+                            child: _CardIconButton(
+                              icon: Icons.play_arrow_rounded,
+                              color: projectColor,
                               onTap: widget.onStart,
-                              child: Container(
-                                width: 26,
-                                height: 26,
-                                decoration: BoxDecoration(
-                                  color: projectColor.withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.play_arrow_rounded,
-                                  size: 14,
-                                  color: projectColor,
-                                ),
-                              ),
                             ),
                           ),
                       ],
@@ -254,6 +332,38 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CardIconButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _CardIconButton({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 14, color: color),
         ),
       ),
     );
