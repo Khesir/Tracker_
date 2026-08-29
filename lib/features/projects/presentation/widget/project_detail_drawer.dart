@@ -603,8 +603,30 @@ class _RecentSessionRowState extends State<_RecentSessionRow> {
     return '$d $mo — $h:$mi';
   }
 
+  // Mirrors SessionRowWidget's headline precedence (title -> post-note ->
+  // "no note"), kept as a separate copy per this codebase's per-row-widget
+  // convention. Title and "has a linked note" are two independent facts,
+  // shown on two independent lines in build() rather than sharing one
+  // text-or-icon slot — see the `if (hasLinkedNote)` block there.
+  ({String text, bool isEmpty}) _headline(SessionModel session) {
+    final title = session.title?.trim();
+    if (title != null && title.isNotEmpty) {
+      return (text: title, isEmpty: false);
+    }
+    final post = session.postNote?.trim();
+    if (post != null && post.isNotEmpty) {
+      return (text: post.replaceAll('\n', ' '), isEmpty: false);
+    }
+    return (text: 'no title', isEmpty: true);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final textFaint = widget.isDark ? AppStyling.textFaintDark : AppStyling.textFaintLight;
+    final accent = widget.isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
+    final hasLinkedNote = widget.session.noteId != null;
+    final headline = _headline(widget.session);
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -619,19 +641,51 @@ class _RecentSessionRowState extends State<_RecentSessionRow> {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: widget.border),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  _fmtDate(widget.session.startedAt),
-                  style: dmSans(size: AppStyling.labelSize, color: widget.textPrimary),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _fmtDate(widget.session.startedAt),
+                      style: dmSans(size: AppStyling.labelSize, color: widget.textPrimary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    widget.fmtDuration(widget.session.durationSeconds),
+                    style: spaceMono(size: 11, weight: FontWeight.w700, color: widget.textMuted),
+                  ),
+                ],
               ),
+              const SizedBox(height: 6),
               Text(
-                widget.fmtDuration(widget.session.durationSeconds),
-                style: spaceMono(size: 11, weight: FontWeight.w700, color: widget.textMuted),
+                headline.text,
+                style: dmSans(
+                  size: AppStyling.labelSize,
+                  color: headline.isEmpty ? textFaint : widget.textMuted,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
+              // Independent of the headline above — always says "linked
+              // note" explicitly, never sharing that line's content with
+              // the title/post-note text.
+              if (hasLinkedNote) ...[
+                const SizedBox(height: 3),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.sticky_note_2_rounded, size: 11, color: accent),
+                    const SizedBox(width: 5),
+                    Text(
+                      'linked note',
+                      style: spaceMono(size: 9.5, weight: FontWeight.w600, color: accent),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

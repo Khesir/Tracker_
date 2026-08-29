@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/models/project_model.dart';
 import '../../../../core/state/stream_builder_widget.dart';
@@ -15,6 +16,7 @@ class ProjectCardWidget extends StatefulWidget {
   final VoidCallback onStop;
   final VoidCallback onPause;
   final VoidCallback onResume;
+  final Future<void> Function(String title) onUpdateTitle;
 
   const ProjectCardWidget({
     super.key,
@@ -27,6 +29,7 @@ class ProjectCardWidget extends StatefulWidget {
     required this.onStop,
     required this.onPause,
     required this.onResume,
+    required this.onUpdateTitle,
   });
 
   @override
@@ -71,6 +74,7 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
           isRunning: isRunning,
           isPaused: isPaused,
           elapsed: timerData.elapsed,
+          title: isThisProject ? timerData.title : null,
         );
       },
     );
@@ -81,6 +85,7 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
     required bool isRunning,
     required bool isPaused,
     required Duration elapsed,
+    required String? title,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppStyling.surfaceDark : AppStyling.surfaceLight;
@@ -191,6 +196,17 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
                           _statusLine(isRunning: isRunning, isPaused: isPaused),
                           style: spaceMono(size: 10.5, color: textMuted),
                         ),
+                        if (isRunning || isPaused) ...[
+                          const SizedBox(height: 3),
+                          _ProjectTitleField(
+                            initialTitle: title,
+                            onSave: widget.onUpdateTitle,
+                            textColor: isDark
+                                ? AppStyling.textPrimaryDark
+                                : AppStyling.textPrimaryLight,
+                            hintColor: textMuted,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -332,6 +348,95 @@ class _ProjectCardWidgetState extends State<ProjectCardWidget> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Live, editable title for the project card's active session — the
+/// primary surface for setting a title on an in-progress session (the
+/// session detail sheet from issue 018 only covers sessions that have
+/// already ended). Only mounted while the card is showing a running or
+/// paused session (see the `isRunning || isPaused` guard at the call
+/// site), so it naturally resets when a session starts fresh. Saves are
+/// debounced (matching `_TitleField`/`_PostNoteField`'s 500ms debounce in
+/// `session_detail_sheet.dart`) and go through
+/// `TimerController.updateTitle()` via [onSave]. Blank is a valid,
+/// unremarkable state; no validation beyond the soft `maxLength` cap.
+class _ProjectTitleField extends StatefulWidget {
+  final String? initialTitle;
+  final Future<void> Function(String value) onSave;
+  final Color textColor;
+  final Color hintColor;
+
+  const _ProjectTitleField({
+    required this.initialTitle,
+    required this.onSave,
+    required this.textColor,
+    required this.hintColor,
+  });
+
+  @override
+  State<_ProjectTitleField> createState() => _ProjectTitleFieldState();
+}
+
+class _ProjectTitleFieldState extends State<_ProjectTitleField> {
+  late final TextEditingController _controller;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialTitle ?? '');
+  }
+
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      widget.onSave(value);
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Fixed height, rather than letting the surrounding IntrinsicHeight
+    // measure this TextField itself: EditableText's own intrinsic-height
+    // query under-reports relative to what it actually needs once laid
+    // out, which made the enclosing Row (IntrinsicHeight + stretch, used
+    // to make the card's left accent bar fill its height) come out too
+    // short and overflow this column. A SizedBox reports its own fixed
+    // height for intrinsic queries regardless of the child, so this both
+    // fixes the mismatch and matches the text's natural line height.
+    return SizedBox(
+      height: 14,
+      child: TextField(
+        key: const Key('project_title_'),
+        controller: _controller,
+        onChanged: _onChanged,
+        maxLength: 80,
+        style: spaceMono(size: 10.5, weight: FontWeight.w700, color: widget.textColor),
+        cursorColor: widget.textColor,
+        decoration: InputDecoration(
+          isDense: true,
+          isCollapsed: true,
+          counterText: '',
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          hintText: 'add a title...',
+          hintStyle: spaceMono(
+            size: 10.5,
+            weight: FontWeight.w700,
+            color: widget.hintColor.withValues(alpha: 0.5),
           ),
         ),
       ),

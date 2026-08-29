@@ -36,15 +36,16 @@ class SessionsController {
     final sessions = current.data;
 
     final rows = [
-      'date,project,duration_seconds,note,music',
+      'date,project,title,duration_seconds,note,music',
       ...sessions.map((s) {
         final project = projectNames[s.projectId] ?? s.projectId;
+        final title = (s.title ?? '').replaceAll('"', '""');
         final note = _noteToText(s.noteJson).replaceAll('"', '""');
         final music = s.musicLog
             .map((m) => '${m.artist} — ${m.title}')
             .join(' | ')
             .replaceAll('"', '""');
-        return '"${s.startedAt.toIso8601String()}","$project","${s.durationSeconds}","$note","$music"';
+        return '"${s.startedAt.toIso8601String()}","$project","$title","${s.durationSeconds}","$note","$music"';
       }),
     ];
 

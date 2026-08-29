@@ -55,7 +55,14 @@ class AppStyling {
   static const Size miniCardSize = Size(296, 146);
   static const Size miniCardNoteSize = Size(296, 314);
   static const Size miniCardPickerSize = Size(296, 286);
-  static const Size miniPillSize = Size(214, 72);
+  // Issue 021 — the vinyl pill gained a title field + a project-switcher
+  // icon (previously it was just elapsed time + expand), so its base
+  // height grew from 72 to fit the new title/switcher row above the
+  // timer row. +picker mirrors the other pickerSize deltas above (the
+  // inline project list's ~140px max height, see ProjectPicker) — a new
+  // state entirely, since the vinyl pill had no picker at all before.
+  static const Size miniPillSize = Size(214, 100);
+  static const Size miniPillPickerSize = Size(214, 240);
   // Issue 011 — sub-states of the note toggle for a resolved project with
   // no note linked yet (NoteResolution.noNoteLinked). The prompt
   // (create-new/link-existing) is compact; the link-existing picker adds

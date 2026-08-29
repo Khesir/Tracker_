@@ -9,6 +9,7 @@ class TimerUiData {
   final Duration elapsed;
   final String? projectId;
   final String? projectName;
+  final String? title;
   final MediaInfo media;
 
   const TimerUiData({
@@ -16,6 +17,7 @@ class TimerUiData {
     this.elapsed = Duration.zero,
     this.projectId,
     this.projectName,
+    this.title,
     this.media = MediaInfo.none,
   });
 
@@ -27,6 +29,7 @@ class TimerUiData {
     Duration? elapsed,
     String? projectId,
     String? projectName,
+    String? title,
     MediaInfo? media,
     SessionModel? session,
   }) {
@@ -35,6 +38,7 @@ class TimerUiData {
       elapsed: elapsed ?? this.elapsed,
       projectId: projectId ?? this.projectId,
       projectName: projectName ?? this.projectName,
+      title: title ?? this.title,
       media: media ?? this.media,
     );
   }

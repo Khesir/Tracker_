@@ -294,6 +294,62 @@ void main() {
     });
   });
 
+  group('updateTitle()', () {
+    test('updates and persists the in-memory active session\'s title immediately', () async {
+      projectsRepo.byId['p1'] = _project(id: 'p1');
+      final controller = buildController();
+      await controller.start(projectId: 'p1', projectName: 'Project p1');
+
+      await controller.updateTitle('deep work block');
+
+      expect(timerRepo.active!.title, 'deep work block');
+    });
+
+    test('a title set before pause() is still present after unpause()', () async {
+      projectsRepo.byId['p1'] = _project(id: 'p1');
+      final controller = buildController();
+      await controller.start(projectId: 'p1', projectName: 'Project p1');
+      await controller.updateTitle('sprint planning');
+
+      await controller.pause();
+      await controller.unpause();
+      controller.dispose();
+
+      expect(controller.uiState.state.title, 'sprint planning');
+      expect(timerRepo.active!.title, 'sprint planning');
+    });
+
+    test('a title set before a simulated restart is restored by resume()', () async {
+      projectsRepo.byId['p1'] = _project(id: 'p1');
+      final first = buildController();
+      await first.start(projectId: 'p1', projectName: 'Project p1');
+      await first.updateTitle('restart survivor');
+      await first.pause();
+
+      // Simulate app restart: brand-new TimerController wired to the same
+      // (persisted) TimerRepository, resuming a session left paused.
+      final second = buildController();
+      await second.resume();
+
+      // resume() only flips status/projectId/title synchronously; elapsed is
+      // recomputed off _activeSession.durationSeconds on the ticker's next
+      // real tick, so give it one before asserting (mirrors the existing
+      // restart test's pattern).
+      await Future.delayed(const Duration(milliseconds: 1100));
+      second.dispose();
+
+      expect(second.uiState.state.title, 'restart survivor');
+    });
+
+    test('is a safe no-op when nothing is running', () async {
+      final controller = buildController();
+
+      await controller.updateTitle('orphan title');
+
+      expect(timerRepo.active, isNull);
+    });
+  });
+
   group('resolveNoteState() while running', () {
     test('resolves against the active session\'s project and reports hasNote', () async {
       projectsRepo.byId['p1'] = _project(id: 'p1', noteId: 'n1');

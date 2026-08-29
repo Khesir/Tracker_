@@ -76,20 +76,35 @@ class _TrackrAppState extends State<TrackrApp> {
           ? const TimerScreen()
           : const _FullAppShell(),
       builder: (context, child) {
-        if (_mode == WindowMode.mini) return child ?? const SizedBox();
-        if (!DesktopTitleBar.isDesktop) return child ?? const SizedBox();
-        return Overlay(
-          initialEntries: [
-            OverlayEntry(
-              builder: (_) => Column(
-                children: [
-                  const DesktopTitleBar(),
-                  Expanded(child: child ?? const SizedBox()),
-                ],
+        final content = child ?? const SizedBox();
+        final Widget shell;
+        if (_mode == WindowMode.mini) {
+          shell = content;
+        } else if (!DesktopTitleBar.isDesktop) {
+          shell = content;
+        } else {
+          shell = Overlay(
+            initialEntries: [
+              OverlayEntry(
+                builder: (_) => Column(
+                  children: [
+                    const DesktopTitleBar(),
+                    Expanded(child: content),
+                  ],
+                ),
               ),
-            ),
-          ],
-        );
+            ],
+          );
+        }
+        // Windows' accessibility bridge (native engine code, not something
+        // Dart can filter) intermittently corrupts its semantics tree on
+        // hover-driven rebuilds across this app, spamming "Failed to update
+        // ui::AXTree" to the console. Harmless — a screen-reader/UI
+        // Automation side channel, unrelated to rendering or input — but
+        // since we don't ship Narrator/screen-reader support for this app,
+        // excluding semantics for the whole tree stops Flutter from feeding
+        // that bridge at all, which stops the error at its source.
+        return ExcludeSemantics(child: shell);
       },
     );
   }

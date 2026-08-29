@@ -19,6 +19,7 @@ import '../../../../core/window/window_service.dart';
 import '../../domain/controller/timer_controller.dart';
 import '../state/timer_ui_state.dart';
 import '../widget/marquee_text_widget.dart';
+import '../widget/mini_title_field_widget.dart';
 import '../widget/note_link_prompt_widget.dart';
 import '../widget/project_picker_widget.dart';
 import '../widget/record_disk_widget.dart';
@@ -344,15 +345,25 @@ class _TimerScreenState extends State<TimerScreen> {
     });
     await windowManager.setMinimumSize(Size.zero);
     if (_isPill) {
-      // Only the bar_ pill wires up a picker today — the vinyl pill has
-      // no project-row affordance at all — but branch on the current
-      // pill's own base size regardless, so this stays correct if that
-      // ever changes.
-      await windowManager.setSize(next ? AppStyling.miniBarPillPickerSize : _basePillSize);
+      // Issue 021 gave the vinyl pill a picker too (it had none before),
+      // so this now branches on style like the card case below rather
+      // than always assuming bar_.
+      final pillPickerSize =
+          _isBar ? AppStyling.miniBarPillPickerSize : AppStyling.miniPillPickerSize;
+      await windowManager.setSize(next ? pillPickerSize : _basePillSize);
       return;
     }
     final pickerSize = _isBar ? AppStyling.miniBarCardPickerSize : AppStyling.miniCardPickerSize;
     await windowManager.setSize(next ? pickerSize : _baseCardSize);
+  }
+
+  // Issue 021 — every mini-widget title field routes through here rather
+  // than calling TimerController.updateTitle() directly, matching how
+  // _onNoteChanged wraps updateNote(): a plain void callback is simpler to
+  // pass down through four widget trees than threading a Future-returning
+  // one, and no caller needs to await the write.
+  void _updateTitle(String title) {
+    _controller.updateTitle(title);
   }
 
   Future<void> _selectProject(ProjectModel project) async {
@@ -396,6 +407,7 @@ class _TimerScreenState extends State<TimerScreen> {
             builder: (context, data) => _isPill ? (_isBar ? BarPill(
               elapsed: _fmt(data.elapsed),
               media: _currentMedia,
+              title: data.title,
               projectName: data.projectName,
               activeProjectId: data.projectId,
               pickerOpen: _pickerOpen,
@@ -403,10 +415,19 @@ class _TimerScreenState extends State<TimerScreen> {
               onExpand: _expandToCard,
               onTogglePicker: _togglePicker,
               onSelectProject: _selectProject,
+              onUpdateTitle: _updateTitle,
             ) : _Pill(
               elapsed: _fmt(data.elapsed),
               media: _currentMedia,
+              title: data.title,
+              projectName: data.projectName,
+              activeProjectId: data.projectId,
+              pickerOpen: _pickerOpen,
+              projects: _projectList,
               onExpand: _expandToCard,
+              onTogglePicker: _togglePicker,
+              onSelectProject: _selectProject,
+              onUpdateTitle: _updateTitle,
             )) : _isBar ? BarCard(
               elapsed: _fmt(data.elapsed),
               data: data,
@@ -428,6 +449,7 @@ class _TimerScreenState extends State<TimerScreen> {
               onTogglePicker: _togglePicker,
               onSelectProject: _selectProject,
               onExpand: () => locator.get<WindowService>().exitMiniMode(),
+              onUpdateTitle: _updateTitle,
             ) : _Card(
               elapsed: _fmt(data.elapsed),
               data: data,
@@ -453,6 +475,7 @@ class _TimerScreenState extends State<TimerScreen> {
               onPlayPause: _media.playPause,
               onPrev: _media.skipPrevious,
               onNext: _media.skipNext,
+              onUpdateTitle: _updateTitle,
             ),
           ),
         ),
@@ -488,6 +511,7 @@ class _Card extends StatelessWidget {
   final VoidCallback onPlayPause;
   final VoidCallback onPrev;
   final VoidCallback onNext;
+  final ValueChanged<String> onUpdateTitle;
 
   const _Card({
     required this.elapsed,
@@ -514,6 +538,7 @@ class _Card extends StatelessWidget {
     required this.onPlayPause,
     required this.onPrev,
     required this.onNext,
+    required this.onUpdateTitle,
   });
 
   @override
@@ -556,6 +581,7 @@ class _Card extends StatelessWidget {
             onPlayPause: onPlayPause,
             onPrev: onPrev,
             onNext: onNext,
+            onUpdateTitle: onUpdateTitle,
           ),
         ),
         // Vinyl overhanging left edge
@@ -598,6 +624,7 @@ class _CardBox extends StatelessWidget {
   final VoidCallback onPlayPause;
   final VoidCallback onPrev;
   final VoidCallback onNext;
+  final ValueChanged<String> onUpdateTitle;
 
   const _CardBox({
     required this.parts,
@@ -624,6 +651,7 @@ class _CardBox extends StatelessWidget {
     required this.onPlayPause,
     required this.onPrev,
     required this.onNext,
+    required this.onUpdateTitle,
   });
 
   @override
@@ -661,72 +689,81 @@ class _CardBox extends StatelessWidget {
           // Body + window controls overlay
           Stack(
             children: [
-              _DragArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(70, 10, 36, 11),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Project title
-                      Text(
-                        data.projectName ?? 'no session',
-                        style: spaceMono(size: 10, color: _kMuted),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      // Timer
-                      RichText(
-                        text: TextSpan(
-                          style: spaceMono(size: 21, weight: FontWeight.w800),
-                          children: [
-                            TextSpan(text: parts[0], style: const TextStyle(color: _kInk)),
-                            const TextSpan(text: ':', style: TextStyle(color: _kMuted, fontWeight: FontWeight.w500)),
-                            TextSpan(text: parts[1], style: const TextStyle(color: _kInk)),
-                            const TextSpan(text: ':', style: TextStyle(color: _kMuted, fontWeight: FontWeight.w500)),
-                            TextSpan(text: parts[2], style: const TextStyle(color: _kAccent)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      // Now playing
-                      if (media.hasTrack)
-                        MarqueeText(
-                          text: 'now playing · ${media.title}',
-                          style: spaceMono(size: 10, color: _kAccent),
-                        )
-                      else
-                        Text(
-                          'not playing',
-                          style: spaceMono(size: 10, color: _kMuted),
-                        ),
-                      const SizedBox(height: 6),
-                      // Transport row
-                      Row(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(70, 10, 36, 11),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Project title — an editable field (issue 021), kept
+                    // outside _DragArea below so clicking/dragging to type
+                    // or select text never starts a window drag instead.
+                    MiniTitleField(
+                      title: data.title,
+                      placeholder: data.projectName ?? 'no session',
+                      onChanged: onUpdateTitle,
+                      style: spaceMono(size: 10, color: _kMuted),
+                      placeholderStyle: spaceMono(size: 10, color: _kMuted.withValues(alpha: 0.6)),
+                    ),
+                    const SizedBox(height: 2),
+                    _DragArea(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _TransportBtn(icon: Icons.skip_previous_rounded, onTap: onPrev),
-                          const SizedBox(width: 2),
-                          _TransportBtn(
-                            icon: media.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                            onTap: onPlayPause,
-                            isPrimary: true,
+                          // Timer
+                          RichText(
+                            text: TextSpan(
+                              style: spaceMono(size: 21, weight: FontWeight.w800),
+                              children: [
+                                TextSpan(text: parts[0], style: const TextStyle(color: _kInk)),
+                                const TextSpan(text: ':', style: TextStyle(color: _kMuted, fontWeight: FontWeight.w500)),
+                                TextSpan(text: parts[1], style: const TextStyle(color: _kInk)),
+                                const TextSpan(text: ':', style: TextStyle(color: _kMuted, fontWeight: FontWeight.w500)),
+                                TextSpan(text: parts[2], style: const TextStyle(color: _kAccent)),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 2),
-                          _TransportBtn(icon: Icons.skip_next_rounded, onTap: onNext),
-                          Container(
-                            width: 1, height: 15,
-                            color: _kLine,
-                            margin: const EdgeInsets.symmetric(horizontal: 5),
-                          ),
-                          const Spacer(),
-                          _TransportBtn(
-                            icon: Icons.edit_note_rounded,
-                            onTap: onToggleNote,
-                            isActive: noteOpen,
+                          const SizedBox(height: 3),
+                          // Now playing
+                          if (media.hasTrack)
+                            MarqueeText(
+                              text: 'now playing · ${media.title}',
+                              style: spaceMono(size: 10, color: _kAccent),
+                            )
+                          else
+                            Text(
+                              'not playing',
+                              style: spaceMono(size: 10, color: _kMuted),
+                            ),
+                          const SizedBox(height: 6),
+                          // Transport row
+                          Row(
+                            children: [
+                              _TransportBtn(icon: Icons.skip_previous_rounded, onTap: onPrev),
+                              const SizedBox(width: 2),
+                              _TransportBtn(
+                                icon: media.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                onTap: onPlayPause,
+                                isPrimary: true,
+                              ),
+                              const SizedBox(width: 2),
+                              _TransportBtn(icon: Icons.skip_next_rounded, onTap: onNext),
+                              Container(
+                                width: 1, height: 15,
+                                color: _kLine,
+                                margin: const EdgeInsets.symmetric(horizontal: 5),
+                              ),
+                              const Spacer(),
+                              _TransportBtn(
+                                icon: Icons.edit_note_rounded,
+                                onTap: onToggleNote,
+                                isActive: noteOpen,
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
               // Window controls (top-right corner)
@@ -778,21 +815,47 @@ class _CardBox extends StatelessWidget {
 class _Pill extends StatelessWidget {
   final String elapsed;
   final MediaInfo media;
+  final String? title;
+  final String? projectName;
+  final String? activeProjectId;
+  final bool pickerOpen;
+  final List<ProjectModel> projects;
   final VoidCallback onExpand;
+  final VoidCallback onTogglePicker;
+  final ValueChanged<ProjectModel> onSelectProject;
+  final ValueChanged<String> onUpdateTitle;
 
-  const _Pill({required this.elapsed, required this.media, required this.onExpand});
+  const _Pill({
+    required this.elapsed,
+    required this.media,
+    required this.title,
+    required this.projectName,
+    required this.activeProjectId,
+    required this.pickerOpen,
+    required this.projects,
+    required this.onExpand,
+    required this.onTogglePicker,
+    required this.onSelectProject,
+    required this.onUpdateTitle,
+  });
 
   @override
   Widget build(BuildContext context) {
     final parts = elapsed.split(':');
 
     // Pill box starts at x=18; vinyl at x=4 (18-14=4).
-    // Pill height=38, vinyl=48 → vinyl overhangs 5px above & below pill.
-    // We offset pill to top=8 so vinyl sits at top=3 (8 - 5 = 3).
+    // Issue 021 grew the pill to fit a title/switcher row above the timer
+    // row (it used to be a single fixed-height row) — pillHeight is now an
+    // estimate of the box's typical two-row content height, used only to
+    // center the vinyl disc against it; the box itself sizes to its actual
+    // content intrinsically (see AppStyling.miniPillSize's comment for the
+    // matching window-size math).
     const pillLeft = 18.0;
     const pillTop = 8.0;
+    const pillWidth = 160.0;
+    const pillHeight = 66.0;
     const vinylLeft = pillLeft - 14.0;
-    const vinylTop = pillTop - 5.0;
+    const vinylTop = pillTop + (pillHeight - _kVinylPill) / 2;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -800,42 +863,91 @@ class _Pill extends StatelessWidget {
         Positioned(
           left: pillLeft,
           top: pillTop,
-          child: _DragArea(
-            child: Container(
-              height: 38,
-              padding: const EdgeInsets.fromLTRB(36, 8, 10, 8),
-              decoration: BoxDecoration(
-                color: _kCardBg,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.50),
-                    offset: const Offset(0, 16),
-                    blurRadius: 34,
-                    spreadRadius: -16,
+          width: pillWidth,
+          child: Container(
+            decoration: BoxDecoration(
+              color: _kCardBg,
+              borderRadius: BorderRadius.circular(pickerOpen ? 14 : 30),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.50),
+                  offset: const Offset(0, 16),
+                  blurRadius: 34,
+                  spreadRadius: -16,
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(36, 8, 10, 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title row — kept outside _DragArea below so typing
+                      // or drag-selecting text never starts a window drag,
+                      // and this new switcher icon never fights with it.
+                      Row(
+                        children: [
+                          Expanded(
+                            child: MiniTitleField(
+                              title: title,
+                              placeholder: projectName ?? 'no session',
+                              onChanged: onUpdateTitle,
+                              style: spaceMono(size: 9, weight: FontWeight.w700, color: _kMuted),
+                              placeholderStyle: spaceMono(
+                                size: 9,
+                                weight: FontWeight.w700,
+                                color: _kMuted.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          _WinBtn(
+                            key: const Key('switch_project_'),
+                            icon: Icons.folder_open_rounded,
+                            tooltip: 'switch project',
+                            onTap: onTogglePicker,
+                            isActive: pickerOpen,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      _DragArea(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            RichText(
+                              text: TextSpan(
+                                style: spaceMono(size: 15, weight: FontWeight.w800),
+                                children: [
+                                  TextSpan(text: parts[0], style: const TextStyle(color: _kInk)),
+                                  const TextSpan(text: ':', style: TextStyle(color: _kMuted, fontWeight: FontWeight.w500)),
+                                  TextSpan(text: parts[1], style: const TextStyle(color: _kInk)),
+                                  const TextSpan(text: ':', style: TextStyle(color: _kMuted, fontWeight: FontWeight.w500)),
+                                  TextSpan(text: parts[2], style: const TextStyle(color: _kAccent)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            _WinBtn(icon: Icons.close_fullscreen_rounded, tooltip: 'expand', onTap: onExpand),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  RichText(
-                    text: TextSpan(
-                      style: spaceMono(size: 15, weight: FontWeight.w800),
-                      children: [
-                        TextSpan(text: parts[0], style: const TextStyle(color: _kInk)),
-                        const TextSpan(text: ':', style: TextStyle(color: _kMuted, fontWeight: FontWeight.w500)),
-                        TextSpan(text: parts[1], style: const TextStyle(color: _kInk)),
-                        const TextSpan(text: ':', style: TextStyle(color: _kMuted, fontWeight: FontWeight.w500)),
-                        TextSpan(text: parts[2], style: const TextStyle(color: _kAccent)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _WinBtn(icon: Icons.close_fullscreen_rounded, tooltip: 'expand', onTap: onExpand),
-                ],
-              ),
+                ),
+                if (pickerOpen) ProjectPicker(
+                  projects: projects,
+                  activeProjectId: activeProjectId,
+                  onSelect: onSelectProject,
+                ),
+              ],
             ),
           ),
         ),
@@ -915,6 +1027,7 @@ class _WinBtn extends StatefulWidget {
   final bool isActive;
 
   const _WinBtn({
+    super.key,
     required this.icon,
     required this.tooltip,
     required this.onTap,
@@ -930,35 +1043,38 @@ class _WinBtnState extends State<_WinBtn> {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: Container(
-            width: 22,
-            height: 20,
-            decoration: BoxDecoration(
-              color: widget.isActive
-                  ? _kAccent.withValues(alpha: 0.12)
-                  : _hovered
-                      ? Colors.black.withValues(alpha: 0.06)
-                      : Colors.transparent,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              widget.icon,
-              size: 12,
-              color: widget.isActive
-                  ? _kAccent
-                  : _hovered
-                      ? _kInk
-                      : const Color(0xFFB0B5BD),
-            ),
+    // No Tooltip wrapper: its hover-triggered OverlayEntry, combined with
+    // this window's native resizing (windowManager.setSize() on picker
+    // toggle), was corrupting the Windows accessibility bridge's semantics
+    // tree (repeated "Failed to update ui::AXTree" engine errors). Console
+    // noise only — no functional break — but avoidable by not using
+    // Tooltip's overlay mechanism here at all.
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          width: 22,
+          height: 20,
+          decoration: BoxDecoration(
+            color: widget.isActive
+                ? _kAccent.withValues(alpha: 0.12)
+                : _hovered
+                    ? Colors.black.withValues(alpha: 0.06)
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            widget.icon,
+            size: 12,
+            color: widget.isActive
+                ? _kAccent
+                : _hovered
+                    ? _kInk
+                    : const Color(0xFFB0B5BD),
           ),
         ),
       ),

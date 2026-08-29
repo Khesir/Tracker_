@@ -94,6 +94,7 @@ class TimerController {
     uiState.update((s) => s.copyWith(
           status: TimerStatus.running,
           projectId: saved.projectId,
+          title: saved.title,
         ));
   }
 
@@ -215,6 +216,19 @@ class TimerController {
             NoteModel(id: noteId, noteJson: '', createdAt: now, updatedAt: now))
         .copyWith(noteJson: noteJson, updatedAt: now);
     await _notesRepo.save(updated);
+  }
+
+  /// Writes [title] onto the in-memory active session and persists it
+  /// immediately — unlike the periodic/pause-triggered duration
+  /// checkpointing (see [_checkpoint]), a title edit must be durable right
+  /// away rather than deferred to the next ticker tick. No-ops (does not
+  /// throw) when there is no active session.
+  Future<void> updateTitle(String title) async {
+    final session = _activeSession;
+    if (session == null) return;
+    _activeSession = session.copyWith(title: title);
+    await _timerRepo.saveSession(_activeSession!);
+    uiState.update((s) => s.copyWith(title: title));
   }
 
   void onMediaChanged(MediaInfo info) {

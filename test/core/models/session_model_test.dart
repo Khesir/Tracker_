@@ -97,4 +97,92 @@ void main() {
       expect(result.postNote, 'preserved');
     });
   });
+
+  group('SessionModel title', () {
+    test('toJson/fromJson round-trips title when set', () {
+      final session = SessionModel(
+        id: 's1',
+        projectId: 'p1',
+        startedAt: DateTime(2026, 1, 1, 9),
+        endedAt: DateTime(2026, 1, 1, 10),
+        durationSeconds: 3600,
+        noteJson: '',
+        musicLog: const [],
+        title: 'deep work block',
+      );
+
+      final result = SessionModel.fromJson(session.toJson());
+
+      expect(result.title, 'deep work block');
+    });
+
+    test('toJson/fromJson round-trips null title', () {
+      final session = SessionModel(
+        id: 's1',
+        projectId: 'p1',
+        startedAt: DateTime(2026, 1, 1, 9),
+        durationSeconds: 0,
+        noteJson: '',
+        musicLog: const [],
+      );
+
+      final result = SessionModel.fromJson(session.toJson());
+
+      expect(result.title, isNull);
+    });
+
+    test('fromJson defaults title to null when absent (old rows)', () {
+      final legacyJson = <String, dynamic>{
+        'id': 's1',
+        'projectId': 'p1',
+        'startedAt': DateTime(2026, 1, 1).toIso8601String(),
+        'endedAt': null,
+        'durationSeconds': 0,
+        'noteJson': 'legacy content',
+        'musicLog': <dynamic>[],
+        'deletedAt': null,
+        // no title key at all
+      };
+
+      final result = SessionModel.fromJson(legacyJson);
+
+      expect(result.title, isNull);
+      expect(result.noteJson, 'legacy content');
+    });
+
+    test('copyWith updates title independently, preserving other fields', () {
+      final session = SessionModel(
+        id: 's1',
+        projectId: 'p1',
+        startedAt: DateTime(2026, 1, 1),
+        durationSeconds: 0,
+        noteJson: '',
+        musicLog: const [],
+        noteId: 'n1',
+        postNote: 'preserved',
+      );
+
+      final withTitle = session.copyWith(title: 'sprint planning');
+
+      expect(withTitle.title, 'sprint planning');
+      expect(withTitle.noteId, 'n1');
+      expect(withTitle.postNote, 'preserved');
+    });
+
+    test('copyWith with no arguments preserves title', () {
+      final session = SessionModel(
+        id: 's1',
+        projectId: 'p1',
+        startedAt: DateTime(2026, 1, 1),
+        durationSeconds: 0,
+        noteJson: '',
+        musicLog: const [],
+        title: 'preserved title',
+      );
+
+      final result = session.copyWith();
+
+      expect(result.title, 'preserved title');
+    });
+  });
 }

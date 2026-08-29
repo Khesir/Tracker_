@@ -32,6 +32,7 @@ const double _kBarPillBottom = 48;
 class BarPill extends StatelessWidget {
   final String elapsed;
   final MediaInfo media;
+  final String? title;
   final String? projectName;
   final String? activeProjectId;
   final bool pickerOpen;
@@ -39,11 +40,13 @@ class BarPill extends StatelessWidget {
   final VoidCallback onExpand;
   final VoidCallback onTogglePicker;
   final ValueChanged<ProjectModel> onSelectProject;
+  final ValueChanged<String> onUpdateTitle;
 
   const BarPill({
     super.key,
     required this.elapsed,
     required this.media,
+    required this.title,
     required this.projectName,
     required this.activeProjectId,
     required this.pickerOpen,
@@ -51,6 +54,7 @@ class BarPill extends StatelessWidget {
     required this.onExpand,
     required this.onTogglePicker,
     required this.onSelectProject,
+    required this.onUpdateTitle,
   });
 
   @override
@@ -135,12 +139,15 @@ class BarPill extends StatelessWidget {
                 ),
               ),
             ),
-            // Project row — docked at the bottom, acts as the picker
-            // toggle. Same component/interaction the bar_ card uses.
+            // Project row — docked at the bottom: chevron icon toggles the
+            // picker, the rest is an editable title field. Same
+            // component/interaction the bar_ card uses.
             BarProjectRow(
-              name: projectName ?? 'no session',
+              title: title,
+              placeholder: projectName ?? 'no session',
               isOpen: pickerOpen,
-              onTap: onTogglePicker,
+              onTogglePicker: onTogglePicker,
+              onTitleChanged: onUpdateTitle,
             ),
             if (pickerOpen) ProjectPicker(
               projects: projects,

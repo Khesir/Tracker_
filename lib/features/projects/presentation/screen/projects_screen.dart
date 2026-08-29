@@ -281,6 +281,8 @@ class _ProjectsScreenState extends ScopedScreenState<ProjectsScreen> {
                                   onStop: () => _stopSession(),
                                   onPause: () => _pauseSession(),
                                   onResume: () => _resumeSession(),
+                                  onUpdateTitle: (title) =>
+                                      _timer.updateTitle(title),
                                 );
                               },
                             ),

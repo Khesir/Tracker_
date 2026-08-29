@@ -113,6 +113,13 @@ class SessionDetailSheet extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _TitleField(
+                        session: session,
+                        onSave: onSave,
+                        textPrimary: textPrimary,
+                        textMuted: textMuted,
+                      ),
+                      const SizedBox(height: 4),
                       Text(
                         projectName,
                         style: spaceMono(
@@ -490,6 +497,80 @@ class _LinkedNoteSectionState extends State<_LinkedNoteSection> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Optional, single-line, directly-editable field for `SessionModel.title`.
+/// Sits above the project name/date as the sheet's de-facto heading. Saves
+/// are debounced (matching `_PostNoteField`'s 500ms debounce) and go through
+/// the same `onSave` callback the rest of this sheet already uses. Leaving
+/// it blank is valid; no validation, just a soft length cap via
+/// `TextField.maxLength`.
+class _TitleField extends StatefulWidget {
+  final SessionModel session;
+  final Future<void> Function(SessionModel updated) onSave;
+  final Color textPrimary;
+  final Color textMuted;
+
+  const _TitleField({
+    required this.session,
+    required this.onSave,
+    required this.textPrimary,
+    required this.textMuted,
+  });
+
+  @override
+  State<_TitleField> createState() => _TitleFieldState();
+}
+
+class _TitleFieldState extends State<_TitleField> {
+  late final TextEditingController _controller;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.session.title ?? '');
+  }
+
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      widget.onSave(widget.session.copyWith(title: value));
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      key: const Key('session_title_'),
+      controller: _controller,
+      onChanged: _onChanged,
+      maxLength: 80,
+      style: spaceMono(size: 16, weight: FontWeight.w800, color: widget.textPrimary),
+      cursorColor: widget.textPrimary,
+      decoration: InputDecoration(
+        isDense: true,
+        isCollapsed: true,
+        counterText: '',
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        hintText: 'add a title...',
+        hintStyle: spaceMono(
+          size: 16,
+          weight: FontWeight.w800,
+          color: widget.textMuted.withValues(alpha: 0.5),
         ),
       ),
     );

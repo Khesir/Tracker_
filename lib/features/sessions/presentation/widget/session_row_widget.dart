@@ -40,19 +40,26 @@ class _SessionRowWidgetState extends State<SessionRowWidget> {
 
   // Legacy `session.noteJson` is dead going forward (issue 010/012) and is
   // deliberately not surfaced here. This row previews `postNote` (plain
-  // text) when present, otherwise hints that a linked note exists via
-  // `noteId` without fetching it (avoids an async NoteModel lookup per row
-  // in what can be a long list — the full read-only preview of the live
-  // linked note lives in `SessionDetailSheet`, opened via [onTap]).
-  ({String text, bool isEmpty}) _preview(SessionModel session) {
+  // text) when present — the full read-only preview of the live linked
+  // note lives in `SessionDetailSheet`, opened via [onTap].
+  //
+  // Title and "has a linked note" are two independent facts, shown on two
+  // independent lines (see build()) rather than sharing one text-or-icon
+  // slot: the headline is always title, else post-note, else "no note";
+  // the "linked note" line only appears when `noteId` is set, and always
+  // says so explicitly — neither line's content ever depends on the other.
+  bool _hasLinkedNote(SessionModel session) => session.noteId != null;
+
+  ({String text, bool isEmpty}) _headline(SessionModel session) {
+    final title = session.title?.trim();
+    if (title != null && title.isNotEmpty) {
+      return (text: title, isEmpty: false);
+    }
     final post = session.postNote?.trim();
     if (post != null && post.isNotEmpty) {
       return (text: post.replaceAll('\n', ' '), isEmpty: false);
     }
-    if (session.noteId != null) {
-      return (text: 'linked note', isEmpty: false);
-    }
-    return (text: 'no note', isEmpty: true);
+    return (text: 'no title', isEmpty: true);
   }
 
   ({String value, String unit}) _splitDuration(int seconds) {
@@ -72,9 +79,11 @@ class _SessionRowWidgetState extends State<SessionRowWidget> {
     final textPrimary = isDark ? AppStyling.textPrimaryDark : AppStyling.textPrimaryLight;
     final textMuted = isDark ? AppStyling.textMutedDark : AppStyling.textMutedLight;
     final textFaint = isDark ? AppStyling.textFaintDark : AppStyling.textFaintLight;
+    final accent = isDark ? AppStyling.accentPrimaryDark : AppStyling.accentLight;
 
     final projectColor = _projectColor();
-    final notePreview = _preview(widget.session);
+    final headline = _headline(widget.session);
+    final hasLinkedNote = _hasLinkedNote(widget.session);
     final timeRange = widget.session.endedAt != null
         ? '${_formatTime(widget.session.startedAt)} → ${_formatTime(widget.session.endedAt!)}'
         : '${_formatTime(widget.session.startedAt)} → …';
@@ -141,21 +150,40 @@ class _SessionRowWidgetState extends State<SessionRowWidget> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-                    child: Row(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.sticky_note_2_outlined, size: 12, color: textFaint),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            notePreview.text,
-                            style: spaceMono(
-                              size: 11,
-                              color: notePreview.isEmpty ? textFaint : textMuted,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
+                        Text(
+                          headline.text,
+                          style: spaceMono(
+                            size: 11,
+                            color: headline.isEmpty ? textFaint : textMuted,
                           ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
+                        // Independent of the headline above — always says
+                        // "linked note" explicitly, never sharing this
+                        // line's content with the title/post-note text.
+                        if (hasLinkedNote) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.sticky_note_2_rounded, size: 11, color: accent),
+                              const SizedBox(width: 5),
+                              Text(
+                                'linked note',
+                                style: spaceMono(
+                                  size: 9.5,
+                                  weight: FontWeight.w600,
+                                  color: accent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

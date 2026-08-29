@@ -11,6 +11,7 @@ class SessionModel {
   final DateTime? deletedAt;
   final String? noteId;
   final String? postNote;
+  final String? title;
 
   const SessionModel({
     required this.id,
@@ -23,6 +24,7 @@ class SessionModel {
     this.deletedAt,
     this.noteId,
     this.postNote,
+    this.title,
   });
 
   bool get isActive => endedAt == null;
@@ -40,6 +42,7 @@ class SessionModel {
         'deletedAt': deletedAt?.toIso8601String(),
         'noteId': noteId,
         'postNote': postNote,
+        'title': title,
       };
 
   factory SessionModel.fromJson(Map<String, dynamic> json) => SessionModel(
@@ -55,6 +58,7 @@ class SessionModel {
         deletedAt: json['deletedAt'] != null ? DateTime.parse(json['deletedAt'] as String) : null,
         noteId: json['noteId'] as String?,
         postNote: json['postNote'] as String?,
+        title: json['title'] as String?,
       );
 
   SessionModel copyWith({
@@ -65,6 +69,7 @@ class SessionModel {
     DateTime? deletedAt,
     String? noteId,
     String? postNote,
+    String? title,
   }) {
     return SessionModel(
       id: id,
@@ -77,6 +82,7 @@ class SessionModel {
       deletedAt: deletedAt ?? this.deletedAt,
       noteId: noteId ?? this.noteId,
       postNote: postNote ?? this.postNote,
+      title: title ?? this.title,
     );
   }
 }

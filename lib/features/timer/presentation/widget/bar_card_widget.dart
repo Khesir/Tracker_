@@ -7,6 +7,7 @@ import '../../../../core/models/project_model.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../state/timer_ui_state.dart';
 import 'marquee_text_widget.dart';
+import 'mini_title_field_widget.dart';
 import 'note_link_prompt_widget.dart';
 import 'project_picker_widget.dart';
 
@@ -55,6 +56,7 @@ class BarCard extends StatelessWidget {
   final VoidCallback onTogglePicker;
   final ValueChanged<ProjectModel> onSelectProject;
   final VoidCallback onExpand;
+  final ValueChanged<String> onUpdateTitle;
 
   const BarCard({
     super.key,
@@ -78,6 +80,7 @@ class BarCard extends StatelessWidget {
     required this.onTogglePicker,
     required this.onSelectProject,
     required this.onExpand,
+    required this.onUpdateTitle,
   });
 
   @override
@@ -177,11 +180,15 @@ class BarCard extends StatelessWidget {
                 ),
               ],
             ),
-            // Project row — docked at the bottom, acts as the picker toggle
+            // Project row — docked at the bottom. Issue 021 split this: the
+            // dedicated chevron icon is now the only picker-toggle tap
+            // target, while the rest of the row is an editable title field.
             BarProjectRow(
-              name: data.projectName ?? 'no session',
+              title: data.title,
+              placeholder: data.projectName ?? 'no session',
               isOpen: pickerOpen,
-              onTap: onTogglePicker,
+              onTogglePicker: onTogglePicker,
+              onTitleChanged: onUpdateTitle,
             ),
             if (noteOpen) NotePanelArea(
               view: noteView,
@@ -207,29 +214,95 @@ class BarCard extends StatelessWidget {
   }
 }
 
-// ── Project row (docked, full-width dropdown affordance) ──────────────────────
+// ── Project row (docked, title field + dedicated switcher icon) ───────────────
 //
 // Public — shared with BarPill (lib/features/timer/presentation/widget/
 // bar_pill_widget.dart), which docks the same row at the bottom of the
 // bar_ pill.
+//
+// Issue 021 split what used to be one big tap target (the whole row opened
+// the picker) into two independent controls: the chevron icon is now the
+// sole picker-toggle tap target, while the diamond bullet + name become an
+// editable MiniTitleField (bound to TimerUiData.title, placeholder = the
+// project name). Typing here never reaches onTogglePicker, and tapping the
+// chevron never touches the text field.
 
-class BarProjectRow extends StatefulWidget {
-  final String name;
+class BarProjectRow extends StatelessWidget {
+  final String? title;
+  final String placeholder;
   final bool isOpen;
-  final VoidCallback onTap;
+  final VoidCallback onTogglePicker;
+  final ValueChanged<String> onTitleChanged;
 
   const BarProjectRow({
     super.key,
-    required this.name,
+    required this.title,
+    required this.placeholder,
+    required this.isOpen,
+    required this.onTogglePicker,
+    required this.onTitleChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: _kLine)),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '◆ ',
+            style: spaceMono(size: 9.5, weight: FontWeight.w700, color: _kAccent),
+          ),
+          Expanded(
+            child: MiniTitleField(
+              title: title,
+              placeholder: placeholder,
+              onChanged: onTitleChanged,
+              style: spaceMono(size: 9.5, weight: FontWeight.w700, color: _kAccent),
+              placeholderStyle: spaceMono(
+                size: 9.5,
+                weight: FontWeight.w700,
+                color: _kAccent.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          _ProjectSwitchBtn(
+            key: const Key('switch_project_'),
+            isOpen: isOpen,
+            onTap: onTogglePicker,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Deliberately smaller than _BarActionBtn below (18x18 vs 25x23) — this
+// docked row used to be a single flush-height text row with a bare 14px
+// chevron Icon as its only affordance; keeping this button compact keeps
+// the row's height close to what it was before the split, so it still
+// fits the bar_ card/pill's existing fixed window sizes without pushing
+// the note panel/picker below it out of frame.
+class _ProjectSwitchBtn extends StatefulWidget {
+  final bool isOpen;
+  final VoidCallback onTap;
+
+  const _ProjectSwitchBtn({
+    super.key,
     required this.isOpen,
     required this.onTap,
   });
 
   @override
-  State<BarProjectRow> createState() => _BarProjectRowState();
+  State<_ProjectSwitchBtn> createState() => _ProjectSwitchBtnState();
 }
 
-class _BarProjectRowState extends State<BarProjectRow> {
+class _ProjectSwitchBtnState extends State<_ProjectSwitchBtn> {
   bool _hovered = false;
 
   @override
@@ -241,33 +314,19 @@ class _BarProjectRowState extends State<BarProjectRow> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          width: 18,
+          height: 18,
           decoration: BoxDecoration(
-            border: const Border(top: BorderSide(color: _kLine)),
             color: (_hovered || widget.isOpen)
-                ? _kAccent.withValues(alpha: 0.06)
+                ? _kAccent.withValues(alpha: 0.12)
                 : Colors.transparent,
+            borderRadius: BorderRadius.circular(5),
           ),
-          child: Row(
-            children: [
-              Text(
-                '◆ ',
-                style: spaceMono(size: 9.5, weight: FontWeight.w700, color: _kAccent),
-              ),
-              Expanded(
-                child: Text(
-                  widget.name,
-                  style: spaceMono(size: 9.5, weight: FontWeight.w700, color: _kAccent),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Icon(
-                widget.isOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                size: 14,
-                color: _kAccent,
-              ),
-            ],
+          alignment: Alignment.center,
+          child: Icon(
+            widget.isOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+            size: 14,
+            color: _kAccent,
           ),
         ),
       ),
@@ -346,27 +405,30 @@ class _BarWinBtnState extends State<BarWinBtn> {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: Container(
-            width: 22,
-            height: 20,
-            decoration: BoxDecoration(
-              color: _hovered ? Colors.black.withValues(alpha: 0.06) : Colors.transparent,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              widget.icon,
-              size: 12,
-              color: _hovered ? _kInk : const Color(0xFFB0B5BD),
-            ),
+    // No Tooltip wrapper: its hover-triggered OverlayEntry, combined with
+    // this window's native resizing (windowManager.setSize() on picker
+    // toggle), was corrupting the Windows accessibility bridge's semantics
+    // tree (repeated "Failed to update ui::AXTree" engine errors). Console
+    // noise only — no functional break — but avoidable by not using
+    // Tooltip's overlay mechanism here at all.
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          width: 22,
+          height: 20,
+          decoration: BoxDecoration(
+            color: _hovered ? Colors.black.withValues(alpha: 0.06) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            widget.icon,
+            size: 12,
+            color: _hovered ? _kInk : const Color(0xFFB0B5BD),
           ),
         ),
       ),
