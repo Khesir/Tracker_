@@ -65,6 +65,11 @@ class TimerController {
   int _inactivityTimeoutSeconds = 300;
   String _inactivityBehavior = 'stop'; // 'disabled', 'pause', 'stop'
 
+  /// How often the running ticker checkpoints elapsed time to disk, so a
+  /// crash/quit mid-session loses at most this much time on the next
+  /// [resume]. [pause] always checkpoints immediately regardless of this.
+  static const _persistIntervalSeconds = 10;
+
   TimerController(
     this._timerRepo,
     this._sessionsRepo,
@@ -131,6 +136,7 @@ class TimerController {
     _ticker = null;
     _inactivityTimer?.cancel();
     _inactivityTimer = null;
+    await _checkpoint(uiState.state.elapsed);
     uiState.update((s) => s.copyWith(status: TimerStatus.paused));
   }
 
@@ -222,7 +228,21 @@ class TimerController {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       final elapsed = DateTime.now().difference(start);
       uiState.update((s) => s.copyWith(elapsed: elapsed));
+      if (elapsed.inSeconds % _persistIntervalSeconds == 0) {
+        _checkpoint(elapsed);
+      }
     });
+  }
+
+  /// Writes [elapsed] onto [_activeSession] and persists it, so whatever
+  /// reads `durationSeconds` next — [_startTicker]'s base on unpause, or a
+  /// freshly-launched app's [resume] — picks up where this session left off
+  /// instead of resetting to the session's starting duration of 0.
+  Future<void> _checkpoint(Duration elapsed) async {
+    final session = _activeSession;
+    if (session == null) return;
+    _activeSession = session.copyWith(durationSeconds: elapsed.inSeconds);
+    await _timerRepo.saveSession(_activeSession!);
   }
 
   void _resetInactivityTimer() {

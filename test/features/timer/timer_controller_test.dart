@@ -223,8 +223,8 @@ void main() {
       projectsRepo.byId['p1'] = _project(id: 'p1');
       final controller = buildController();
       await controller.start(projectId: 'p1', projectName: 'Project p1');
-      final pausedSession = timerRepo.active;
       await controller.pause();
+      final pausedSession = timerRepo.active;
 
       await controller.start(projectId: 'p1', projectName: 'Project p1');
 
@@ -237,14 +237,60 @@ void main() {
       projectsRepo.byId['p2'] = _project(id: 'p2');
       final controller = buildController();
       await controller.start(projectId: 'p1', projectName: 'Project p1');
-      final pausedSession = timerRepo.active;
       await controller.pause();
+      final pausedSession = timerRepo.active;
 
       await controller.start(projectId: 'p2', projectName: 'Project p2');
 
       expect(controller.uiState.state.isPaused, isTrue);
       expect(controller.uiState.state.projectId, 'p1');
       expect(timerRepo.active, same(pausedSession));
+    });
+  });
+
+  group('pause() / unpause()', () {
+    test('unpause continues from the elapsed time at pause instead of resetting to 0', () async {
+      projectsRepo.byId['p1'] = _project(id: 'p1');
+      final controller = buildController();
+      await controller.start(projectId: 'p1', projectName: 'Project p1');
+
+      // Simulate time passing while running, then pause.
+      controller.uiState.update((s) => s.copyWith(elapsed: const Duration(seconds: 90)));
+      await controller.pause();
+
+      expect(controller.uiState.state.isPaused, isTrue);
+      expect(controller.uiState.state.elapsed, const Duration(seconds: 90));
+      expect(timerRepo.active!.durationSeconds, 90);
+
+      await controller.unpause();
+      controller.dispose();
+
+      expect(controller.uiState.state.isRunning, isTrue);
+      expect(controller.uiState.state.elapsed.inSeconds, greaterThanOrEqualTo(90));
+    });
+
+    test('resume() after a simulated restart continues from the last checkpointed duration',
+        () async {
+      projectsRepo.byId['p1'] = _project(id: 'p1');
+      final first = buildController();
+      await first.start(projectId: 'p1', projectName: 'Project p1');
+      first.uiState.update((s) => s.copyWith(elapsed: const Duration(seconds: 200)));
+      await first.pause();
+
+      expect(timerRepo.active!.durationSeconds, 200);
+
+      // Simulate app restart: brand-new TimerController wired to the same
+      // (persisted) TimerRepository, resuming a session left paused.
+      final second = buildController();
+      await second.resume();
+
+      // resume() only flips status/projectId synchronously; elapsed is
+      // recomputed off _activeSession.durationSeconds on the ticker's next
+      // real tick, so give it one before asserting.
+      await Future.delayed(const Duration(milliseconds: 1100));
+      second.dispose();
+
+      expect(second.uiState.state.elapsed.inSeconds, greaterThanOrEqualTo(200));
     });
   });
 
