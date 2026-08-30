@@ -1,0 +1,196 @@
+@use "../../styles/variables" as v;
+
+// Mobile-first, matching the 560px section-local breakpoint FeaturesSection
+// landed on (no shared breakpoint token exists in styles/_variables.scss).
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-card-gap);
+  width: 100%;
+  min-width: 0;
+}
+
+.heading {
+  margin-bottom: 0;
+}
+
+.subheading {
+  margin-top: calc(var(--space-card-gap) * 2);
+  margin-bottom: 0;
+}
+
+.fallback {
+  color: var(--color-text-muted);
+}
+
+// ── Version + platform buttons ──────────────────────────────────────────
+
+.versionRow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.versionLabel {
+  font-size: var(--font-size-label);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--color-text-muted);
+}
+
+.version {
+  font-size: var(--font-size-stats);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.platforms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-card-gap);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 560px) {
+  .platforms {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+.platform {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+  min-width: 0;
+  padding: var(--space-card-padding-v) var(--space-card-padding-h);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.platformLink {
+  font-weight: 700;
+}
+
+.platformNote {
+  font-size: var(--font-size-badge);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--color-text-faint);
+}
+
+// ── Changelog ────────────────────────────────────────────────────────────
+
+.changelog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-card-gap);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.releaseItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--space-card-padding-v) var(--space-card-padding-h);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+// The current release gets the accent-tinted treatment other sections use
+// for emphasis (e.g. the accent badge colors in globals.scss), so it reads
+// as visually distinct from older, plain-bordered entries at a glance.
+.releaseItem.current {
+  border-color: var(--color-accent);
+  background: var(--color-accent-dim);
+}
+
+.releaseHeader {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.releaseVersion {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.currentBadge {
+  padding: 2px 8px;
+  border-radius: var(--radius-badge);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-size: var(--font-size-badge);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+
+.releaseDate {
+  margin-left: auto;
+  font-size: var(--font-size-badge);
+  color: var(--color-text-faint);
+}
+
+.releaseBody {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  overflow-wrap: break-word;
+  word-break: break-word;
+
+  :global(p) {
+    margin: 0 0 0.5em;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  :global(ul),
+  :global(ol) {
+    margin: 0 0 0.5em;
+    padding-left: 1.25em;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  :global(li) {
+    margin: 0.15em 0;
+  }
+
+  :global(strong) {
+    color: var(--color-text-primary);
+  }
+
+  :global(a) {
+    color: var(--color-accent);
+
+    &:hover,
+    &:focus-visible {
+      color: var(--color-accent-ink);
+    }
+  }
+
+  :global(h1),
+  :global(h2),
+  :global(h3),
+  :global(h4) {
+    margin: 0 0 0.4em;
+    font-size: var(--font-size-body);
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+}

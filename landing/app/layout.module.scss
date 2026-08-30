@@ -1,0 +1,15 @@
+@use "../styles/variables" as v;
+
+.siteHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-card-gap);
+  padding: var(--space-card-padding-v) var(--space-card-padding-h);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}

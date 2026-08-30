@@ -1,0 +1,78 @@
+@use "../../styles/variables" as v;
+
+// Mobile-first: comfortable fluid spacing/type at narrow viewports via
+// clamp(), so there's no reliance on a breakpoint just to stay readable.
+// The 560px breakpoint below only fine-tunes the CTA once there's room,
+// matching the value FeaturesSection landed on (no shared token exists yet
+// in styles/_variables.scss).
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-card-gap);
+  width: 100%;
+  min-width: 0;
+  padding: clamp(40px, 10vw, 96px) 0 clamp(28px, 6vw, 56px);
+}
+
+.logo {
+  font-size: clamp(28px, 8vw, 44px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+}
+
+.tagline {
+  max-width: 46ch;
+  color: var(--color-text-muted);
+  font-size: clamp(14px, 3.5vw, 16px);
+  line-height: 1.6;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+// Element selector bumps specificity above InteractiveLabel's own
+// `.label` rules (color/hover/focus), regardless of CSS-module bundling
+// order — same technique ScreenshotsSection uses for `span.caption`. The
+// primary CTA gets a filled background instead of the plain accent-text
+// link style, so it reads as one single, visually obvious button.
+a.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  margin-top: calc(var(--space-card-gap) / 2);
+  padding: 14px 28px;
+  border-radius: var(--radius-card);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-weight: 700;
+  text-decoration: none;
+  width: 100%;
+  justify-content: center;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--color-accent-ink);
+    color: var(--color-bg);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+  }
+}
+
+@media (min-width: 560px) {
+  a.cta {
+    width: auto;
+    justify-content: flex-start;
+  }
+}
+
+.ctaUnavailable {
+  margin-top: calc(var(--space-card-gap) / 2);
+  color: var(--color-text-faint);
+  font-size: var(--font-size-body);
+}

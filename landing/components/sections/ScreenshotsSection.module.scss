@@ -1,0 +1,55 @@
+@use "../../styles/variables" as v;
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-card-gap);
+  width: 100%;
+  // Mobile-first: no fixed/min width wider than the smallest supported
+  // viewport, so this never forces horizontal scroll on its own.
+  max-width: 100%;
+}
+
+// auto-fit + minmax reflows the gallery to a single column once the
+// container can no longer fit a 220px item — this covers typical mobile
+// widths (~320px+) without needing an explicit breakpoint variable (none
+// is defined in styles/_variables.scss as of this issue).
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: calc(var(--space-card-gap) * 2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-card-gap) / 2);
+  min-width: 0; // allow grid items to shrink below content size
+}
+
+.frame {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  line-height: 0;
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+// Element selector (not just the class) gives this a higher specificity
+// than InteractiveLabel's own `.label { cursor: pointer }`, regardless of
+// which CSS module's rules land first in the compiled bundle — captions
+// here are static text (rendered `as="span"`), not clickable.
+span.caption {
+  align-self: flex-start;
+  cursor: default;
+}

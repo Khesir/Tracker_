@@ -1,0 +1,115 @@
+@use "./variables" as v;
+
+// CSS custom properties bridge the compile-time SCSS variables above into
+// runtime-switchable values: [data-theme] flips per the theme toggle
+// (see components/theme/theme-script.ts), while spacing/radius/type-scale
+// tokens are theme-independent and live under :root only.
+:root {
+  --radius-card: #{v.$radius-card};
+  --radius-badge: #{v.$radius-badge};
+  --radius-stat-box: #{v.$radius-stat-box};
+  --progress-bar-height: #{v.$progress-bar-height};
+  --space-card-padding-h: #{v.$space-card-padding-h};
+  --space-card-padding-v: #{v.$space-card-padding-v};
+  --space-card-gap: #{v.$space-card-gap};
+
+  --font-size-display: #{v.$font-size-display};
+  --font-size-timer: #{v.$font-size-timer};
+  --font-size-stats: #{v.$font-size-stats};
+  --font-size-body: #{v.$font-size-body};
+  --font-size-label: #{v.$font-size-label};
+  --font-size-badge: #{v.$font-size-badge};
+}
+
+// Dark ("Ocean Deep") is the default/fallback palette — matches the
+// <html data-theme="dark"> default in app/layout.tsx and the theme-script's
+// own fallback when neither localStorage nor prefers-color-scheme resolve.
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #{v.$bg-dark};
+  --color-surface: #{v.$surface-dark};
+  --color-surface-raised: #{v.$surface-raised-dark};
+  --color-border: #{v.$border-dark};
+  --color-border-strong: #{v.$border-dark};
+  --color-text-primary: #{v.$text-primary-dark};
+  --color-text-muted: #{v.$text-muted-dark};
+  --color-text-faint: #{v.$text-faint-dark};
+  --color-accent: #{v.$accent-primary-dark};
+  --color-accent-ink: #{v.$accent-ink-dark};
+  --color-accent-secondary: #{v.$accent-secondary-dark};
+  --color-accent-dim: #{v.$accent-dim-dark};
+  --color-accent-tint-2: #{v.$accent-dim-dark};
+  --color-accent-badge-text: #{v.$accent-badge-text-dark};
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg: #{v.$bg-light};
+  --color-surface: #{v.$surface-light};
+  --color-surface-raised: #{v.$surface-light};
+  --color-border: #{v.$border-light};
+  --color-border-strong: #{v.$border-light-strong};
+  --color-text-primary: #{v.$text-primary-light};
+  --color-text-muted: #{v.$text-muted-light};
+  --color-text-faint: #{v.$text-faint-light};
+  --color-accent: #{v.$accent-light};
+  --color-accent-ink: #{v.$accent-ink-light};
+  --color-accent-secondary: #{v.$accent-dark-light};
+  --color-accent-dim: #{v.$accent-dim-light};
+  --color-accent-tint-2: #{v.$accent-tint-2-light};
+  --color-accent-badge-text: #{v.$accent-ink-light};
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}

@@ -1,0 +1,52 @@
+// Design tokens mirrored 1:1 from `lib/core/theme/app_styling.dart`'s
+// `AppStyling` class (the Flutter app's design system). There is no
+// automated bridge between the Flutter app and this Next.js project (see
+// the PRD's "Out of Scope" section) — if `AppStyling` changes, these values
+// need to be updated here by hand.
+
+// ── Light palette ("Arctic Green") ──────────────────────────────────────
+$bg-light: #fcfcfd;
+$surface-light: #ffffff;
+$border-light: #edeef1;
+$border-light-strong: #e4e5ea;
+$text-primary-light: #1a1c22;
+$text-muted-light: #9aa0ab;
+$text-faint-light: #b9bdc5;
+$accent-light: #1fbf6b;
+$accent-ink-light: #0f8f4d;
+$accent-dim-light: #e4f8ed;
+$accent-tint-2-light: #d2f3e0;
+$accent-dark-light: #0f8f4d;
+
+// ── Dark palette ("Ocean Deep") ──────────────────────────────────────────
+$bg-dark: #0a1628;
+$surface-dark: #0f1e34;
+$surface-raised-dark: #0f2340;
+$border-dark: #1a3a5c;
+$text-primary-dark: #e8f4ff;
+$text-muted-dark: #4a7a9a;
+$text-faint-dark: #2a5a7a;
+$accent-primary-dark: #1d9e75;
+$accent-ink-dark: #15c488;
+$accent-secondary-dark: #4aaccc;
+$accent-dim-dark: #04342c;
+$accent-badge-text-dark: #5dcaa5;
+
+// ── Spacing & radius scale ────────────────────────────────────────────────
+$radius-card: 10px;
+$radius-badge: 20px;
+$radius-stat-box: 8px;
+$progress-bar-height: 3px;
+$space-card-padding-h: 14px;
+$space-card-padding-v: 12px;
+$space-card-gap: 10px;
+
+// ── Type scale ─────────────────────────────────────────────────────────────
+// Carried over for future sections; JetBrains Mono itself is loaded via
+// next/font/google in app/layout.tsx, not here.
+$font-size-display: 30px;
+$font-size-timer: 32px;
+$font-size-stats: 24px;
+$font-size-body: 14px;
+$font-size-label: 11px;
+$font-size-badge: 9px;

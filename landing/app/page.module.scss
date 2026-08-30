@@ -1,0 +1,27 @@
+@use "../styles/variables" as v;
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-card-gap);
+  max-width: 640px;
+  margin: 0 auto;
+  padding: clamp(24px, 6vw, 64px) var(--space-card-padding-h);
+}
+
+.title {
+  font-size: var(--font-size-display);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.tagline {
+  color: var(--color-text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space-card-gap) * 2);
+  margin-top: var(--space-card-gap);
+}

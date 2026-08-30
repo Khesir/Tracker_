@@ -1,0 +1,16 @@
+@use "../../styles/variables" as v;
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-stat-box);
+  padding: 6px 10px;
+  background: var(--color-surface);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+}

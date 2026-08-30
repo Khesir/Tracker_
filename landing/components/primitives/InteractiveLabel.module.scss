@@ -1,0 +1,36 @@
+@use "../../styles/variables" as v;
+
+.label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15em;
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  font-weight: 500;
+  color: var(--color-accent);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease, opacity 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--color-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  &[aria-disabled="true"],
+  &:disabled {
+    color: var(--color-text-faint);
+    cursor: not-allowed;
+    text-decoration: none;
+  }
+}

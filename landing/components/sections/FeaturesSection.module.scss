@@ -1,0 +1,58 @@
+@use "../../styles/variables" as v;
+
+// Mobile-first: single column by default (no horizontal scroll at narrow
+// viewports), widening to a 2-column grid once there's room. No breakpoint
+// tokens exist yet in styles/_variables.scss (023 didn't define any), so
+// this is a conservative, section-local breakpoint rather than a shared one.
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-card-gap);
+  width: 100%;
+  min-width: 0;
+}
+
+.heading {
+  margin-bottom: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-card-gap);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 560px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--space-card-padding-v) var(--space-card-padding-h);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.name {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.description {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}

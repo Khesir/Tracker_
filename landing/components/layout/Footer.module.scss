@@ -1,0 +1,33 @@
+@use "../../styles/variables" as v;
+
+// Mobile-first, matching the 560px section-local breakpoint FeaturesSection
+// established (see FeaturesSection.module.scss — no shared breakpoint
+// tokens exist yet in styles/_variables.scss): stacked by default, widening
+// to a single row once there's room.
+.footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-card-gap);
+  padding: var(--space-card-padding-v) var(--space-card-padding-h);
+  border-top: 1px solid var(--color-border);
+}
+
+@media (min-width: 560px) {
+  .footer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space-card-gap) * 2);
+}
+
+.version {
+  color: var(--color-text-faint);
+  font-size: var(--font-size-label);
+}
